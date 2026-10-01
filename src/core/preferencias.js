@@ -13,6 +13,7 @@ import { archivoPreferencias } from "./rutas.js";
  * @property {boolean} instruccionesActivas
  * @property {ModoPermisos} permisos
  * @property {boolean} barraBotones Mostrar la barra de botones dentro del chat.
+ * @property {boolean} barraCompleta Barra con todos los botones (si no, solo los esenciales).
  * @property {boolean} modoPrincipiante Mostrar consejos y explicaciones.
  * @property {boolean} buscarModelosLocales Buscar Ollama, LM Studio, etc. al iniciar.
  * @property {boolean} selectorGrafico Usar la ventana del sistema para elegir carpetas.
@@ -28,6 +29,7 @@ export const PREFERENCIAS_POR_DEFECTO = {
 	instruccionesActivas: true,
 	permisos: "preguntar",
 	barraBotones: true,
+	barraCompleta: false,
 	modoPrincipiante: true,
 	buscarModelosLocales: true,
 	selectorGrafico: true,

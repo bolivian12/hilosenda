@@ -86,9 +86,11 @@ npm install -g --ignore-scripts github:bolivian12/pruebarepositori
   hilosenda averigua el protocolo y lista sus modelos.
 - Los modelos que Pi ya trae siguen apareciendo por defecto.
 
-**Dentro del chat**
-- Barra de botones clicables: Menu, Modelo, Razonamiento, Permisos, Instrucciones, Carpeta,
-  Nuevo chat, Historial, Inicio, Ayuda, y **Detener** mientras la IA trabaja.
+**Dentro del chat** (diseño tranquilo, pensado para quien empieza)
+- Un saludo sencillo y tarjetas con ideas para empezar, que se envian con un clic.
+- Barra de botones sencilla: Menu, Modelo, Nuevo chat e Inicio, y **Detener** mientras la IA
+  trabaja. En Ajustes se puede activar la barra completa (razonamiento, permisos, instrucciones,
+  carpeta, historial).
 - **Menu** con todas las funciones de Pi explicadas en español (tambien con `F1`).
 - Cambiar de carpeta sin salir: hilosenda reabre el chat en la nueva carpeta.
 - El borrador que estabas escribiendo no se pierde al pulsar botones.

@@ -67,21 +67,30 @@ export function leerTablaModelos(texto) {
  */
 export function listarModelosPi() {
 	const { cli } = rutaCliPi();
+	// Sin conexion a internet: usa el catalogo guardado, que es mucho mas rapido.
+	const env = { ...process.env, PI_OFFLINE: "1", PI_SKIP_VERSION_CHECK: "1" };
 	return new Promise((resolver) => {
-		execFile(process.execPath, [cli, "--list-models"], { windowsHide: true, maxBuffer: 16 * 1024 * 1024, timeout: 60000 }, (_error, salida) => {
+		execFile(process.execPath, [cli, "--list-models"], { env, windowsHide: true, maxBuffer: 16 * 1024 * 1024, timeout: 60000 }, (_error, salida) => {
 			resolver(leerTablaModelos(String(salida ?? "")));
 		});
 	});
 }
 
-/** Conversaciones guardadas por Pi, de la mas reciente a la mas antigua. */
-export async function listarConversaciones() {
-	const { SessionManager } = await import("@earendil-works/pi-coding-agent");
-	try {
-		return await SessionManager.listAll();
-	} catch {
-		return [];
-	}
+/**
+ * Conversaciones guardadas por Pi, de la mas reciente a la mas antigua.
+ * Se leen en un proceso aparte para no congelar la pantalla mientras Pi carga.
+ */
+export function listarConversaciones() {
+	const script = join(RAIZ_HILOSENDA, "src", "core", "conversaciones-cli.js");
+	return new Promise((resolver) => {
+		execFile(process.execPath, [script], { windowsHide: true, maxBuffer: 64 * 1024 * 1024, timeout: 60000 }, (_error, salida) => {
+			try {
+				resolver(JSON.parse(String(salida || "[]")));
+			} catch {
+				resolver([]);
+			}
+		});
+	});
 }
 
 /**

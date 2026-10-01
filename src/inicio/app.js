@@ -146,14 +146,25 @@ export class App {
 		});
 	}
 
-	/** Actualiza en segundo plano la lista de modelos y la IA local detectada. */
+	/**
+	 * Carga en segundo plano (en otros procesos, sin congelar la pantalla) los modelos,
+	 * las conversaciones y la IA local detectada. Los botones usan estos datos ya listos.
+	 */
 	refrescarDatos() {
-		listarModelosPi()
+		this.cargaModelos = listarModelosPi()
 			.then((modelos) => {
 				this.modelos = modelos;
+				this.modelosListos = true;
 				this.tui?.requestRender();
+				return modelos;
 			})
-			.catch(() => {});
+			.catch(() => this.modelos);
+		this.cargaConversaciones = listarConversaciones()
+			.then((sesiones) => {
+				this.conversaciones = sesiones;
+				return sesiones;
+			})
+			.catch(() => this.conversaciones ?? []);
 		if (this.preferencias.buscarModelosLocales) {
 			buscarServidoresLocales()
 				.then((locales) => {
@@ -290,6 +301,24 @@ export class App {
 		this.mensaje = { texto: `Carpeta elegida: ${rutaBonita(ruta)}`, tipo: "exito" };
 	}
 
+	/** Espera datos que se cargan en segundo plano, mostrando una pantalla solo si hace falta. */
+	async esperarDatos(mensaje, promesa, listos) {
+		if (listos) return promesa;
+		const resultado = await this.dialogos.esperar(mensaje, promesa);
+		return resultado ?? [];
+	}
+
+	/** Mensaje mientras Pi arranca, para que la consola no quede vacia ni muestre lo anterior. */
+	pantallaCarga(mensaje) {
+		const ancho = process.stdout.columns || 80;
+		const alto = process.stdout.rows || 24;
+		const e = this.estilo;
+		const texto = `${e.acento("◆")}  ${e.texto(mensaje)}`;
+		const x = Math.max(1, Math.floor((ancho - mensaje.length - 3) / 2));
+		const y = Math.max(1, Math.floor(alto / 2));
+		process.stdout.write(`\x1b[?1049h\x1b[2J\x1b[${y};${x}H${texto}\x1b[?25l`);
+	}
+
 	// --- Chat ---------------------------------------------------------------------------
 
 	/**
@@ -304,8 +333,7 @@ export class App {
 			this.usarCarpeta(ruta);
 		}
 		if (!modeloPorDefecto() && this.modelos.length === 0 && !opciones.alIniciar) {
-			const modelos = await this.dialogos.esperar("Revisando que IA tienes conectada…", listarModelosPi());
-			this.modelos = modelos;
+			const modelos = await this.esperarDatos("Revisando que IA tienes conectada…", this.cargaModelos ?? listarModelosPi(), this.modelosListos);
 			if (modelos.length === 0) {
 				const quiere = await this.dialogos.confirmar({
 					titulo: "Primero conecta una IA",
@@ -327,7 +355,10 @@ export class App {
 				return;
 			}
 			agregarReciente(carpeta);
+			// Oculta la lista tecnica de extensiones al abrir el chat (solo si no se configuro antes).
+			if (leerAjustesPi().quietStartup === undefined) guardarAjustesPi({ quietStartup: "header" });
 			this.apagar();
+			this.pantallaCarga(`Abriendo el chat en ${basename(carpeta) || carpeta}…`);
 			const { traspaso } = await abrirPi({ carpeta, argumentos, alIniciar, tema: this.preferencias.tema });
 			this.encender();
 			this.preferencias = leerPreferencias();
@@ -369,7 +400,12 @@ export class App {
 	}
 
 	async abrirHistorial() {
-		const sesiones = await this.dialogos.esperar("Cargando tus conversaciones…", listarConversaciones());
+		// Si ya estan cargadas aparecen al instante; si no, se espera a la carga en curso.
+		const sesiones = this.conversaciones ?? (await this.esperarDatos("Cargando tus conversaciones…", this.cargaConversaciones ?? listarConversaciones(), false));
+		this.cargaConversaciones = listarConversaciones().then((lista) => {
+			this.conversaciones = lista;
+			return lista;
+		});
 		const elementos = sesiones.map((s) => {
 			const titulo = (s.name || s.firstMessage || "(conversacion vacia)").replace(/\s+/g, " ").trim();
 			return {
@@ -411,13 +447,13 @@ export class App {
 		guardarAjustesPi({ defaultProvider: resultado.proveedor, defaultModel: resultado.modelo });
 		this.locales = this.locales.filter((l) => l.proveedor.id !== resultado.proveedor);
 		this.mensaje = { texto: `Listo: usaras ${resultado.proveedor} / ${resultado.modelo}`, tipo: "exito" };
+		this.modelosListos = false;
 		this.refrescarDatos();
 		return true;
 	}
 
 	async elegirModelo() {
-		const modelos = await this.dialogos.esperar("Cargando modelos disponibles…", listarModelosPi());
-		this.modelos = modelos;
+		const modelos = this.modelosListos ? this.modelos : await this.esperarDatos("Cargando modelos disponibles…", this.cargaModelos ?? listarModelosPi(), false);
 		const actual = modeloPorDefecto();
 		const personalizados = leerModelosJson().providers;
 		const elementos = modelos.map((m) => {
@@ -583,6 +619,8 @@ export class App {
 			if (!quitar) continue;
 			if (eleccion.tipo === "clave") quitarClave(eleccion.id);
 			else quitarProveedor(eleccion.id);
+			this.modelosListos = false;
+			this.refrescarDatos();
 			const porDefecto = modeloPorDefecto();
 			if (porDefecto?.proveedor === eleccion.id) guardarAjustesPi({ defaultProvider: undefined, defaultModel: undefined });
 		}
