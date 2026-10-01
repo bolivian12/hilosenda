@@ -55,14 +55,30 @@ if (-not $NodeExe) {
 }
 
 # --- 2. hilosenda y Pi --------------------------------------------------------------
-$fuente = if ($env:HILOSENDA_FUENTE) { $env:HILOSENDA_FUENTE } else { "https://codeload.github.com/$Repo/tar.gz/refs/heads/$Ref" }
+# Si este script esta dentro de una copia del proyecto (git clone), se instala esa copia.
+$raizLocal = $null
+if ($PSScriptRoot) {
+	$candidata = Split-Path -Parent $PSScriptRoot
+	$paqueteLocal = Join-Path $candidata 'package.json'
+	if ((Test-Path $paqueteLocal) -and ((Get-Content $paqueteLocal -Raw) -match '"name": "hilosenda"')) { $raizLocal = $candidata }
+}
+$fuente = if ($env:HILOSENDA_FUENTE) { $env:HILOSENDA_FUENTE } elseif ($raizLocal) { $raizLocal } else { "https://codeload.github.com/$Repo/tar.gz/refs/heads/$Ref" }
+if (Test-Path $fuente -PathType Container) {
+	Info "Preparando hilosenda desde $fuente..."
+	$carpetaPaquete = Join-Path $env:TEMP ("hilosenda-" + [Guid]::NewGuid().ToString('N'))
+	New-Item -ItemType Directory -Force -Path $carpetaPaquete | Out-Null
+	Push-Location $fuente
+	try { & $NodeExe $NpmCli pack --pack-destination $carpetaPaquete --silent | Out-Null } finally { Pop-Location }
+	$fuente = (Get-ChildItem -Path $carpetaPaquete -Filter *.tgz | Select-Object -First 1).FullName
+	if (-not $fuente) { Fallar 'No se pudo preparar la copia local de hilosenda.' }
+}
 $carpetaApp = Join-Path $Dir 'app'
 New-Item -ItemType Directory -Force -Path $carpetaApp | Out-Null
 $paquete = Join-Path $carpetaApp 'package.json'
 if (-not (Test-Path $paquete)) { Set-Content -Path $paquete -Value '{ "name": "hilosenda-instalacion", "private": true }' -Encoding ASCII }
 Info 'Descargando hilosenda y Pi (puede tardar un minuto)...'
 & $NodeExe $NpmCli install --prefix $carpetaApp --omit=dev --ignore-scripts --no-audit --no-fund --no-update-notifier --loglevel=error $fuente
-if ($LASTEXITCODE -ne 0) { Fallar 'No se pudo instalar hilosenda. Revisa tu conexion a internet y vuelve a intentarlo.' }
+if ($LASTEXITCODE -ne 0) { Fallar 'No se pudo instalar hilosenda. Revisa tu conexion a internet. Si el repositorio es privado, descargalo con git clone y ejecuta install\install.ps1 desde esa carpeta.' }
 $App = Join-Path $carpetaApp 'node_modules\hilosenda\bin\hilosenda.js'
 if (-not (Test-Path $App)) { Fallar 'La instalacion quedo incompleta.' }
 Ok 'hilosenda instalado'

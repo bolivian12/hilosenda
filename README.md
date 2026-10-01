@@ -40,6 +40,19 @@ aplicaciones. Tambien puedes escribir `hilosenda` en cualquier terminal.
 > Para instalar otra rama (por ejemplo, una version en pruebas) define `HILOSENDA_REF`:
 > `curl -fsSL …/install.sh | HILOSENDA_REF=mi-rama sh`
 
+**Si el repositorio es privado**, los enlaces de arriba dan error 404 (GitHub no deja descargar
+sin iniciar sesion). Descargalo con git, que si usa tu cuenta, y ejecuta el instalador desde ahi:
+
+```sh
+git clone https://github.com/bolivian12/pruebarepositori.git hilosenda
+cd hilosenda
+sh install/install.sh        # en Windows: powershell -ExecutionPolicy Bypass -File install\install.ps1
+```
+
+**NixOS**: el instalador lo detecta y obtiene Node.js con Nix (los programas genericos de Linux
+no funcionan en NixOS). Si usas home-manager, agrega `~/.local/bin` a `home.sessionPath`.
+Recomendado tambien: `fd` y `ripgrep` instalados con Nix, porque Pi los usa para buscar archivos.
+
 Si ya tienes Node.js 22.19 o mas nuevo, tambien puedes instalarlo con npm:
 
 ```sh
