@@ -4,7 +4,7 @@
 // aporta una funcion `mostrar` que pone una Pantalla en la consola y devuelve una
 // promesa con el valor con el que se cerro.
 
-import { Campo, FilaBotones, Lista, Pantalla, Parrafo } from "./widgets.js";
+import { Campo, FilaBotones, Lista, Pantalla, Parrafo, Tarjeta } from "./widgets.js";
 
 /**
  * @typedef {(construir: (cerrar: (valor: any) => void) => Pantalla) => Promise<any>} Mostrar
@@ -22,10 +22,13 @@ import { Campo, FilaBotones, Lista, Pantalla, Parrafo } from "./widgets.js";
 /**
  * @param {import("./style.js").Estilo} estilo
  * @param {Mostrar} mostrar
- * @param {{ altoLista?: () => number }} [opciones] `altoLista` decide cuantas filas muestran las listas.
+ * @param {{ altoLista?: () => number, altoPantalla?: () => number }} [opciones]
+ *   `altoLista`: cuantas filas muestran las listas. `altoPantalla`: si se indica, cada dialogo
+ *   ocupa toda la consola con su barra de estado abajo.
  * @returns {Dialogos}
  */
 export function crearDialogos(estilo, mostrar, opciones = {}) {
+	const altoPantalla = opciones.altoPantalla;
 	const altoLista = opciones.altoLista ?? (() => Math.max(5, Math.min(16, (process.stdout.rows || 24) - 14)));
 	const VOLVER = { id: "__volver", etiqueta: "← Volver", tipo: "suave" };
 
@@ -36,6 +39,7 @@ export function crearDialogos(estilo, mostrar, opciones = {}) {
 			return mostrar((cerrar) => {
 				const pantalla = new Pantalla(estilo, {
 					titulo,
+					alto: altoPantalla,
 					alSalir: () => cerrar(undefined),
 					pie: "Clic para elegir · rueda o flechas para moverte · escribe para buscar · Esc para volver",
 				});
@@ -63,6 +67,7 @@ export function crearDialogos(estilo, mostrar, opciones = {}) {
 			return mostrar((cerrar) => {
 				const pantalla = new Pantalla(estilo, {
 					titulo,
+					alto: altoPantalla,
 					alSalir: () => cerrar(undefined),
 					pie: "Escribe o pega (clic derecho o Ctrl+V) y pulsa Enter · Esc para volver",
 				});
@@ -95,7 +100,7 @@ export function crearDialogos(estilo, mostrar, opciones = {}) {
 
 		confirmar({ titulo, explicacion, si = "Si", no = "No", peligro = false }) {
 			return mostrar((cerrar) => {
-				const pantalla = new Pantalla(estilo, { titulo, alSalir: () => cerrar(false) });
+				const pantalla = new Pantalla(estilo, { titulo, alto: altoPantalla, alSalir: () => cerrar(false) });
 				if (explicacion) pantalla.agregar(new Parrafo(explicacion));
 				pantalla.agregar(new Parrafo(""));
 				pantalla.agregar(
@@ -114,7 +119,7 @@ export function crearDialogos(estilo, mostrar, opciones = {}) {
 
 		botones({ titulo, explicacion, botones, grande = true }) {
 			return mostrar((cerrar) => {
-				const pantalla = new Pantalla(estilo, { titulo, alSalir: () => cerrar(undefined) });
+				const pantalla = new Pantalla(estilo, { titulo, alto: altoPantalla, alSalir: () => cerrar(undefined) });
 				if (explicacion) pantalla.agregar(new Parrafo(explicacion));
 				pantalla.agregar(new Parrafo(""));
 				pantalla.agregar(new FilaBotones(estilo, botones, { grande, mostrarAyuda: true, alPulsar: (id) => cerrar(id) }));
@@ -138,7 +143,7 @@ export function crearDialogos(estilo, mostrar, opciones = {}) {
 				const marcos = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"];
 				let paso = 0;
 				pantalla.agregar(new Parrafo(""));
-				pantalla.agregar(new Parrafo(() => `${estilo.acento(marcos[paso % marcos.length])} ${mensaje}`));
+				pantalla.agregar(new Tarjeta(estilo, () => [[{ t: marcos[paso % marcos.length], fg: estilo.c.acento, negrita: true }, { t: `  ${mensaje}`, fg: estilo.c.texto }]]));
 				const reloj = setInterval(() => {
 					paso++;
 					pantalla.pedirRender();
@@ -156,7 +161,7 @@ export function crearDialogos(estilo, mostrar, opciones = {}) {
 
 		informar({ titulo, texto, boton = "Entendido" }) {
 			return mostrar((cerrar) => {
-				const pantalla = new Pantalla(estilo, { titulo, alSalir: () => cerrar(undefined) });
+				const pantalla = new Pantalla(estilo, { titulo, alto: altoPantalla, alSalir: () => cerrar(undefined) });
 				pantalla.agregar(new Parrafo(texto));
 				pantalla.agregar(new Parrafo(""));
 				pantalla.agregar(new FilaBotones(estilo, [{ id: "ok", etiqueta: boton, tipo: "primario" }], { alPulsar: () => cerrar(undefined) }));

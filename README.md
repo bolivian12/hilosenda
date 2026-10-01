@@ -65,7 +65,9 @@ npm install -g --ignore-scripts github:bolivian12/pruebarepositori
    solos. Si prefieres una IA en la nube (Claude, GPT, Gemini, OpenRouter...), pega tu clave API:
    hilosenda **detecta automaticamente todos los modelos disponibles**.
 2. **Elige una carpeta.** Pulsa «Elegir carpeta» y se abre la ventana normal de tu sistema para
-   elegirla (o un explorador dentro de la consola si no hay ventanas, por ejemplo por SSH).
+   elegirla: el selector de Windows, el de macOS o, en Linux, el de tu escritorio (GNOME, KDE,
+   Hyprland...) a traves del portal de escritorio. Si no hay ventanas (por ejemplo por SSH), se
+   abre un explorador dentro de la consola.
 3. **Chatea.** Pulsa «Empezar a chatear», escribe lo que necesitas en lenguaje normal y pulsa Enter.
 
 ## Que trae
@@ -101,6 +103,11 @@ npm install -g --ignore-scripts github:bolivian12/pruebarepositori
 **Instrucciones**
 - Elige libremente cualquier archivo `.md` o `.txt` con reglas para la IA (idioma, estilo,
   tecnologias...). Se lee antes de cada respuesta, asi que puedes editarlo cuando quieras.
+
+**Aspecto de aplicacion de escritorio**: botones con forma de pildora, tarjetas con esquinas
+redondeadas que se iluminan al pasar el raton, barra de titulo con ✕, barra de estado inferior
+clicable (modelo, razonamiento, carpeta, uso de memoria y costo) y temas propios claro y oscuro
+para todo el chat.
 
 **Ajustes**: tema (automatico, oscuro o claro), razonamiento por defecto, barra de botones,
 consejos para principiantes, animacion, ventana del sistema para carpetas, conexiones guardadas.
@@ -142,7 +149,9 @@ hilosenda -- <opciones>    pasa opciones directamente a Pi
   Ghostty, WezTerm y la mayoria de terminales modernas. En Windows se recomienda
   [Windows Terminal](https://aka.ms/terminal).
 - Todo tiene tambien manejo con teclado: flechas, Tab, Enter y Esc.
-- En Linux, la ventana para elegir carpetas usa `zenity` o `kdialog` si estan instalados.
+- En Linux, la ventana para elegir carpetas usa el portal de escritorio (`xdg-desktop-portal`), que
+  ya viene con GNOME y KDE. Si no lo tienes, usa `zenity` o `kdialog`; en NixOS puede obtener
+  `zenity` con Nix automaticamente.
 
 ## Donde se guardan las cosas
 
@@ -169,7 +178,8 @@ src/inicio/app.js         pantalla de inicio (centro de control)
 extension/hilosenda.ts    extension que se carga dentro de Pi (barra, menu, permisos...)
 src/flujos/               asistentes compartidos: conectar IA, carpetas, instrucciones
 src/core/                 deteccion de modelos, configuracion, ventanas del sistema
-src/ui/                   botones, listas, campos y animacion (raton + teclado)
+src/ui/                   botones, tarjetas, listas, campos y animacion (raton + teclado)
+temas/                    temas de colores claro y oscuro para el chat
 install/                  instaladores para Windows, macOS y Linux
 ```
 

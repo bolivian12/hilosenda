@@ -9,6 +9,7 @@
 // Todos los comandos originales de Pi siguen funcionando igual.
 
 import { existsSync, readFileSync, statSync, writeFileSync } from "node:fs";
+import { homedir } from "node:os";
 import { basename } from "node:path";
 import type { ExtensionAPI, ExtensionCommandContext, ExtensionContext } from "@earendil-works/pi-coding-agent";
 import { CustomEditor } from "@earendil-works/pi-coding-agent";
@@ -21,10 +22,12 @@ import { elegirPermisos, gestionarInstrucciones, NIVELES, nombreNivel, PERMISOS,
 import { AYUDA_GENERAL } from "../src/textos.js";
 import { logoDegradado } from "../src/ui/animacion.js";
 import { crearDialogos } from "../src/ui/dialogos.js";
-import { estiloDesdeTemaPi } from "../src/ui/style.js";
-import { FilaBotones } from "../src/ui/widgets.js";
+import { crearEstilo } from "../src/ui/style.js";
+import { FilaBotones, recortar, Tarjeta } from "../src/ui/widgets.js";
 
 type Dialogos = ReturnType<typeof crearDialogos>;
+type Estilo = ReturnType<typeof crearEstilo>;
+type EventoRaton = Parameters<NonNullable<InstanceType<typeof CustomEditor>["handleMouse"]>>[0];
 type ModeloPi = NonNullable<ExtensionContext["model"]>;
 
 const HERRAMIENTAS_SOLO_LECTURA = new Set(["read", "grep", "find", "ls", "tool_search", "codemode"]);
@@ -60,13 +63,72 @@ const COMANDOS_PI: Array<{ nombre: string; etiqueta: string; detalle: string; gr
 	{ nombre: "quit", etiqueta: "Salir del chat", detalle: "Cierra el chat (la conversacion queda guardada)", grupo: "Ayuda" },
 ];
 
-/** Editor de Pi que ademas permite a la barra de botones ejecutar comandos. */
-class EditorHilosenda extends CustomEditor {}
+/** Ideas para empezar, que se envian con un clic. */
+const SUGERENCIAS = [
+	{ id: "explicar", etiqueta: "Explícame este proyecto", texto: "Explícame qué hay en esta carpeta y para qué sirve, en pocas palabras." },
+	{ id: "errores", etiqueta: "Busca errores", texto: "Revisa el proyecto y dime si ves errores o problemas, ordenados por importancia." },
+	{ id: "readme", etiqueta: "Crea un README", texto: "Crea un archivo README.md claro que explique este proyecto y cómo usarlo." },
+	{ id: "ideas", etiqueta: "¿Qué puedes hacer?", texto: "¿Qué cosas puedes hacer por mí en esta carpeta? Dame ejemplos concretos." },
+];
+
+/**
+ * Cuadro de texto de Pi con titulo, pista de teclas y un boton «Enviar ▶» clicable.
+ * Tambien permite que la barra de botones ejecute comandos (usa su onSubmit).
+ */
+class EditorHilosenda extends CustomEditor {
+	estilo: () => Estilo = () => crearEstilo();
+	alMover?: () => void;
+	private hoverEnviar = false;
+	private zonaEnviar?: { x0: number; x1: number };
+
+	protected override renderTopBorder(width: number, hiddenLineCount: number): string {
+		if (hiddenLineCount > 0 || this.embedWorkingStatus) return super.renderTopBorder(width, hiddenLineCount);
+		const e = this.estilo();
+		const etiqueta = " ✎ Tu mensaje ";
+		return this.borderColor("──") + e.pintar(etiqueta, { fg: e.c.suave, negrita: true }) + this.borderColor("─".repeat(Math.max(0, width - 2 - visibleWidth(etiqueta))));
+	}
+
+	protected override renderBottomBorder(width: number, hiddenLineCount: number): string {
+		const e = this.estilo();
+		const boton = " Enviar ▶ ";
+		const anchoBoton = visibleWidth(boton) + 2;
+		if (width < anchoBoton + 10) return super.renderBottomBorder(width, hiddenLineCount);
+		const pista = hiddenLineCount > 0 ? ` ↓ ${hiddenLineCount} líneas más ` : " Enter envía · Shift+Enter: nueva línea ";
+		const vacio = this.getText().trim() === "";
+		const fondo = vacio ? e.c.tarjeta : this.hoverEnviar ? e.mezclar(e.c.acento, e.c.texto, 0.25) : e.c.acento;
+		const frente = vacio ? e.c.tenue : e.c.textoSobreAcento;
+		const pistaVisible = recortar(pista, Math.max(0, width - anchoBoton - 6));
+		const relleno = Math.max(0, width - 2 - visibleWidth(pistaVisible) - anchoBoton - 2);
+		this.zonaEnviar = { x0: width - 2 - anchoBoton, x1: width - 3 };
+		return this.borderColor("──") + e.pintar(pistaVisible, { fg: e.c.tenue }) + this.borderColor("─".repeat(relleno)) + e.pastilla(boton, fondo, frente) + this.borderColor("──");
+	}
+
+	override handleMouse(evento: EventoRaton) {
+		const filaInferior = ((this as unknown as { renderedVisibleLineCount?: number }).renderedVisibleLineCount ?? 0) + 1;
+		const sobre = Boolean(this.zonaEnviar && evento.y === filaInferior && evento.x >= this.zonaEnviar.x0 && evento.x <= this.zonaEnviar.x1);
+		if (evento.type === "move" || evento.type === "drag") {
+			this.alMover?.();
+			if (sobre !== this.hoverEnviar) {
+				this.hoverEnviar = sobre;
+				return { handled: true, render: true };
+			}
+			return super.handleMouse(evento);
+		}
+		if (sobre && evento.button === "left") {
+			if (evento.type === "click" && this.getText().trim() !== "") this.handleInput("\r");
+			return { handled: true };
+		}
+		return super.handleMouse(evento);
+	}
+}
 
 export default function hilosenda(pi: ExtensionAPI) {
 	let ctxActual: ExtensionContext | undefined;
 	let editor: EditorHilosenda | undefined;
 	let pedirRenderBarra: (() => void) | undefined;
+	let filaBarra: FilaBotones | undefined;
+	let filaSugerencias: FilaBotones | undefined;
+	let costoCache = { entradas: -1, total: 0 };
 	let trabajando = false;
 	let dialogoAbierto = false;
 	let herramientasAntesDeLectura: string[] | undefined;
@@ -75,22 +137,23 @@ export default function hilosenda(pi: ExtensionAPI) {
 
 	// --- Utilidades ---------------------------------------------------------------
 
-	/** Tema de Pi siempre actualizado, aunque la persona lo cambie durante el chat. */
-	const temaVivo = new Proxy(
-		{},
-		{
-			get(_, clave) {
-				const tema = ctxActual?.ui.theme as unknown as Record<string | symbol, unknown>;
-				const valor = tema?.[clave];
-				return typeof valor === "function" ? (valor as (...a: unknown[]) => unknown).bind(tema) : valor;
-			},
-		},
-	);
-	const estilo = estiloDesdeTemaPi(temaVivo);
+	/** Estilo de hilosenda que sigue al tema de Pi (claro u oscuro), aunque cambie durante el chat. */
+	let estiloCache: { oscuro: boolean; estilo: Estilo } | undefined;
+	function estiloActual(): Estilo {
+		const oscuro = (ctxActual?.ui.theme as { appearance?: string } | undefined)?.appearance !== "light";
+		if (!estiloCache || estiloCache.oscuro !== oscuro) estiloCache = { oscuro, estilo: crearEstilo({ oscuro }) };
+		return estiloCache.estilo;
+	}
+
+	/** Quita el efecto de raton de la barra y las sugerencias (al mover el raton fuera de ellas). */
+	function limpiarHovers() {
+		const cambio = Boolean(filaBarra?.quitarHover()) || Boolean(filaSugerencias?.quitarHover());
+		if (cambio) pedirRenderBarra?.();
+	}
 
 	function dialogos(ctx: ExtensionContext): Dialogos {
 		return crearDialogos(
-			estilo,
+			estiloActual(),
 			(construir) =>
 				ctx.ui.custom((tui, _tema, _teclas, done) => {
 					const pantalla = construir(done);
@@ -371,7 +434,7 @@ export default function hilosenda(pi: ExtensionAPI) {
 					titulo: "Ajustes de hilosenda",
 					explicacion: "Haz clic en un ajuste para cambiarlo.",
 					elementos: [
-						{ id: "tema", etiqueta: "Tema de colores", detalle: "Automatico, oscuro o claro", valor: "tema" },
+						{ id: "tema", etiqueta: "Tema de colores", detalle: { auto: "hilosenda automático", oscuro: "hilosenda oscuro", claro: "hilosenda claro", pi: "el de Pi" }[p.tema ?? "auto"] ?? "hilosenda", valor: "tema" },
 						{ id: "barra", etiqueta: "Barra de botones", detalle: siNo(p.barraBotones), valor: "barra" },
 						{ id: "principiante", etiqueta: "Consejos para principiantes", detalle: siNo(p.modoPrincipiante), valor: "principiante" },
 						{ id: "permisos", etiqueta: "Permisos de la IA", detalle: permisoPorId(p.permisos).etiqueta, valor: "permisos" },
@@ -384,14 +447,18 @@ export default function hilosenda(pi: ExtensionAPI) {
 					const tema = await ui.elegir({
 						titulo: "Tema de colores",
 						elementos: [
-							{ id: "system", etiqueta: "Automatico", detalle: "Igual que tu consola", valor: "system" },
-							{ id: "dark", etiqueta: "Oscuro", valor: "dark" },
-							{ id: "light", etiqueta: "Claro", valor: "light" },
+							{ id: "auto", etiqueta: "hilosenda automático", detalle: "Claro u oscuro según tu consola", valor: "auto" },
+							{ id: "oscuro", etiqueta: "hilosenda oscuro", valor: "oscuro" },
+							{ id: "claro", etiqueta: "hilosenda claro", valor: "claro" },
+							{ id: "pi", etiqueta: "El tema de Pi", detalle: "El que elijas en los ajustes avanzados de Pi", valor: "pi" },
 						],
+						inicial: p.tema ?? "auto",
 					});
 					if (typeof tema === "string") {
-						const r = ctx.ui.setTheme(tema);
-						if (r.success) guardarAjustesPi({ theme: tema });
+						guardarPreferencias({ tema: tema as "auto" | "oscuro" | "claro" | "pi" });
+						const nombre = tema === "oscuro" ? "hilosenda-oscuro" : tema === "claro" ? "hilosenda-claro" : undefined;
+						if (nombre) ctx.ui.setTheme(nombre);
+						else ctx.ui.notify("El tema se aplicará la próxima vez que abras el chat.", "info");
 					}
 				} else if (eleccion === "barra") {
 					guardarPreferencias({ barraBotones: !p.barraBotones });
@@ -454,53 +521,190 @@ export default function hilosenda(pi: ExtensionAPI) {
 
 	// --- Barra de botones ----------------------------------------------------------
 
-	function botonesBarra() {
+	function botonesBarra(compacta = false) {
 		const ctx = ctxActual;
 		const p = leerPreferencias();
-		const corto = (texto: string, max: number) => (visibleWidth(texto) > max ? `${texto.slice(0, max - 1)}…` : texto);
-		const botones = [];
-		if (trabajando) botones.push({ id: "detener", etiqueta: "■ Detener", tipo: "peligro" as const });
+		const botones: Array<{ id: string; etiqueta: string; icono?: string; tipo?: "primario" | "normal" | "peligro" | "suave" }> = [];
+		if (trabajando) botones.push({ id: "detener", icono: "■", etiqueta: "Detener", tipo: "peligro" });
 		botones.push(
-			{ id: "menu", etiqueta: "≡ Menu", tipo: "primario" as const },
-			{ id: "modelo", etiqueta: `Modelo: ${corto(nombreModelo(ctx?.model), 26)} ▾` },
-			{ id: "razonamiento", etiqueta: `Razona: ${ctx?.model?.reasoning ? nombreNivel(pi.getThinkingLevel()) : "no"} ▾` },
-			{ id: "permisos", etiqueta: `Permisos: ${permisoPorId(p.permisos).corto} ▾` },
-			{ id: "instrucciones", etiqueta: `Instrucciones: ${p.instrucciones && p.instruccionesActivas ? corto(nombreCorto(p.instrucciones), 18) : "no"} ▾` },
-			{ id: "carpeta", etiqueta: `Carpeta: ${corto(basename(ctx?.cwd ?? "") || "/", 18)} ▾` },
-			{ id: "nuevo", etiqueta: "+ Nuevo chat" },
-			{ id: "historial", etiqueta: "Historial" },
-			{ id: "inicio", etiqueta: "Inicio" },
-			{ id: "ayuda", etiqueta: "?" },
+			{ id: "menu", icono: "≡", etiqueta: "Menú", tipo: "primario" },
+			{ id: "modelo", icono: "◆", etiqueta: `${recortar(nombreModelo(ctx?.model), 24)} ▾` },
+			{ id: "razonamiento", icono: "◑", etiqueta: `${ctx?.model?.reasoning ? nombreNivel(pi.getThinkingLevel()) : "Sin razonar"} ▾` },
+			{ id: "permisos", icono: "◈", etiqueta: `${permisoPorId(p.permisos).corto} ▾` },
+			{ id: "instrucciones", icono: "✎", etiqueta: `${p.instrucciones && p.instruccionesActivas ? recortar(nombreCorto(p.instrucciones), 16) : "Sin instrucciones"} ▾` },
+			{ id: "carpeta", icono: "▤", etiqueta: `${recortar(basename(ctx?.cwd ?? "") || "/", 16)} ▾` },
 		);
-		return botones;
+		const derechaDesde = botones.length;
+		const derecha = [
+			{ id: "nuevo", icono: "✚", etiqueta: "Nuevo" },
+			{ id: "historial", icono: "❝", etiqueta: "Historial" },
+			{ id: "inicio", icono: "⌂", etiqueta: "Inicio" },
+			{ id: "ayuda", icono: "?", etiqueta: "Ayuda" },
+		];
+		// En ventanas estrechas, los accesos de la derecha quedan solo con su icono.
+		for (const b of derecha) botones.push(compacta ? { id: b.id, etiqueta: b.icono, tipo: "suave" } : { ...b, tipo: "suave" });
+		return { botones, derechaDesde };
 	}
 
 	function instalarBarra(ctx: ExtensionContext) {
 		if (!leerPreferencias().barraBotones) {
 			ctx.ui.setWidget("hilosenda-barra", undefined);
 			pedirRenderBarra = undefined;
+			filaBarra = undefined;
 			return;
 		}
 		ctx.ui.setWidget(
 			"hilosenda-barra",
 			(tui) => {
-				const fila = new FilaBotones(estilo, botonesBarra(), {
+				const fila = new FilaBotones(estiloActual(), [], {
 					alPulsar: (id: string) => {
 						if (ctxActual) void ejecutarAccion(ctxActual, id);
 					},
 				});
+				filaBarra = fila;
 				pedirRenderBarra = () => tui.requestRender();
 				return {
 					render(ancho: number) {
-						fila.setBotones(botonesBarra());
-						return fila.render(ancho);
+						const anchoDe = (lista: ReturnType<typeof botonesBarra>["botones"]) =>
+							lista.reduce((total, b) => total + visibleWidth(` ${b.icono ? `${b.icono}  ` : ""}${b.etiqueta} `) + 3, 0);
+						let { botones, derechaDesde } = botonesBarra();
+						if (anchoDe(botones) > ancho) ({ botones, derechaDesde } = botonesBarra(true));
+						fila.estilo = estiloActual();
+						fila.setBotones(botones);
+						fila.derechaDesde = derechaDesde;
+						// Una linea libre arriba: separa del chat y detecta cuando el raton se va.
+						return ["", ...fila.render(ancho)];
 					},
 					invalidate() {},
-					handleMouse: (evento) => fila.handleMouse(evento),
+					handleMouse(evento: EventoRaton) {
+						if (evento.y === 0) {
+							if ((evento.type === "move" || evento.type === "drag") && (fila.quitarHover() || filaSugerencias?.quitarHover())) return { handled: true, render: true };
+							return undefined;
+						}
+						if (evento.type === "move") filaSugerencias?.quitarHover();
+						return fila.handleMouse({ ...evento, y: evento.y - 1, height: evento.height - 1 });
+					},
 				};
 			},
 			{ placement: "aboveEditor" },
 		);
+	}
+
+	function instalarSugerencias(ctx: ExtensionContext) {
+		ctx.ui.setWidget(
+			"hilosenda-consejo",
+			(tui) => {
+				const fila = new FilaBotones(
+					estiloActual(),
+					SUGERENCIAS.map((s) => ({ id: s.id, etiqueta: s.etiqueta, tipo: "suave" as const })),
+					{
+						alPulsar: (id: string) => {
+							const sugerencia = SUGERENCIAS.find((s) => s.id === id);
+							if (!sugerencia || !ctxActual) return;
+							ctxActual.ui.setWidget("hilosenda-consejo", undefined);
+							filaSugerencias = undefined;
+							ejecutarComando(ctxActual, sugerencia.texto);
+						},
+					},
+				);
+				filaSugerencias = fila;
+				return {
+					render(ancho: number) {
+						const e = estiloActual();
+						fila.estilo = e;
+						return [e.pintar("  Prueba con un clic:", { fg: e.c.tenue }), ...fila.render(ancho)];
+					},
+					invalidate() {},
+					handleMouse(evento: EventoRaton) {
+						if (evento.type === "move") filaBarra?.quitarHover();
+						if (evento.y === 0) return (evento.type === "move" || evento.type === "drag") && fila.quitarHover() ? { handled: true, render: true } : undefined;
+						const r = fila.handleMouse({ ...evento, y: evento.y - 1, height: evento.height - 1 });
+						if (r) tui.requestRender();
+						return r;
+					},
+				};
+			},
+			{ placement: "belowEditor" },
+		);
+	}
+
+	/** Costo acumulado de la conversacion, segun lo que informa cada respuesta. */
+	function costoSesion(ctx: ExtensionContext): number {
+		const entradas = ctx.sessionManager.getEntries();
+		if (entradas.length === costoCache.entradas) return costoCache.total;
+		let total = 0;
+		for (const entrada of entradas as Array<{ type: string; message?: { role?: string; usage?: { cost?: { total?: number } } } }>) {
+			if (entrada.type === "message" && entrada.message?.role === "assistant") total += entrada.message.usage?.cost?.total ?? 0;
+		}
+		costoCache = { entradas: entradas.length, total };
+		return total;
+	}
+
+	/** Barra de estado inferior, como en un editor de codigo. Sus partes son clicables. */
+	function instalarPie(ctx: ExtensionContext) {
+		ctx.ui.setFooter((tui, _tema, datos) => {
+			let zonas: Array<{ id: string; x0: number; x1: number }> = [];
+			let hover = "";
+			return {
+				render(ancho: number) {
+					const e = estiloActual();
+					const c = ctxActual;
+					const fondo = e.c.barra;
+					const uso = c?.getContextUsage();
+					const porcentaje = uso?.percent ?? (uso?.tokens && uso.contextWindow ? (uso.tokens / uso.contextWindow) * 100 : 0);
+					const llenos = Math.round(Math.min(100, porcentaje ?? 0) / 12.5);
+					const colorUso = (porcentaje ?? 0) > 85 ? e.c.error : (porcentaje ?? 0) > 60 ? e.c.aviso : e.c.acento;
+					const rama = datos.getGitBranch();
+					const carpeta = (c?.cwd ?? "").replace(homedir(), "~");
+					const costo = c ? costoSesion(c) : 0;
+					const partes: Array<{ id?: string; segmentos: Array<{ t: string; fg?: unknown; negrita?: boolean }> }> = [
+						{ id: "modelo", segmentos: [{ t: "◆ ", fg: e.c.acentos[4] }, { t: recortar(nombreModelo(c?.model), 30), fg: e.c.texto, negrita: true }] },
+						{ id: "razonamiento", segmentos: [{ t: "◑ ", fg: e.c.acentos[5] }, { t: c?.model?.reasoning ? nombreNivel(pi.getThinkingLevel()) : "sin razonar", fg: e.c.texto }] },
+						{ id: "carpeta", segmentos: [{ t: "▤ ", fg: e.c.acentos[0] }, { t: recortar(carpeta, 36), fg: e.c.texto }, ...(rama ? [{ t: `  rama ${rama}`, fg: e.c.suave }] : [])] },
+						{ segmentos: [{ t: "▰".repeat(llenos), fg: colorUso }, { t: "▱".repeat(8 - llenos), fg: e.c.tenue }, { t: ` ${(porcentaje ?? 0).toFixed(1)}% de ${contextoCorto(uso?.contextWindow) || "?"}`, fg: e.c.suave }] },
+					];
+					if (costo > 0) partes.push({ segmentos: [{ t: `$${costo < 0.01 ? costo.toFixed(4) : costo.toFixed(2)}`, fg: e.c.suave }] });
+					const estados = [...datos.getExtensionStatuses().entries()].filter(([clave]) => clave !== "hilosenda").map(([, valor]) => valor);
+					if (estados.length) partes.push({ segmentos: [{ t: estados.join("  "), fg: e.c.suave }] });
+
+					let linea = e.pintar(" ", { bg: fondo });
+					let x = 1;
+					zonas = [];
+					partes.forEach((parte, i) => {
+						if (i > 0) {
+							linea += e.segmentos([{ t: " │ ", fg: e.c.borde }], fondo);
+							x += 3;
+						}
+						const encima = parte.id && parte.id === hover;
+						const texto = e.segmentos([{ t: " " }, ...(parte.segmentos as never[]), { t: " " }], encima ? e.c.tarjetaHover : fondo);
+						const w = visibleWidth(texto);
+						if (x + w > ancho - 1) return;
+						if (parte.id) zonas.push({ id: parte.id, x0: x, x1: x + w - 1 });
+						linea += texto;
+						x += w;
+					});
+					const marca = e.segmentos([{ t: "hilosenda ", fg: e.c.tenue }], fondo);
+					const hueco = ancho - x - visibleWidth(marca);
+					linea += hueco > 0 ? e.pintar(" ".repeat(hueco), { bg: fondo }) + marca : e.pintar(" ".repeat(Math.max(0, ancho - x)), { bg: fondo });
+					return [linea];
+				},
+				invalidate() {},
+				handleMouse(evento: EventoRaton) {
+					const zona = zonas.find((z) => evento.x >= z.x0 && evento.x <= z.x1);
+					if (evento.type === "move" || evento.type === "drag") {
+						limpiarHovers();
+						const nuevo = zona?.id ?? "";
+						if (nuevo === hover) return zona ? { handled: true, render: false } : undefined;
+						hover = nuevo;
+						tui.requestRender();
+						return { handled: true, render: true };
+					}
+					if (!zona || evento.button !== "left") return undefined;
+					if (evento.type === "click" && ctxActual) void ejecutarAccion(ctxActual, zona.id);
+					return { handled: true };
+				},
+			};
+		});
 	}
 
 	function instalarCabecera(ctx: ExtensionContext) {
@@ -508,15 +712,22 @@ export default function hilosenda(pi: ExtensionAPI) {
 			ctx.ui.setHeader(undefined);
 			return;
 		}
-		ctx.ui.setHeader((_tui, tema) => ({
+		ctx.ui.setHeader(() => ({
 			render(ancho: number) {
-				const consejo = [
-					"Escribe abajo lo que necesitas, en lenguaje normal, y pulsa Enter.",
-					"Usa los botones de arriba del cuadro de texto, o escribe / para ver todos los comandos.",
-					"Esc detiene a la IA · la rueda del raton mueve la conversacion · F1 abre el menu.",
-				];
+				const e = estiloActual();
 				const centrar = (linea: string) => " ".repeat(Math.max(0, Math.floor((ancho - visibleWidth(linea)) / 2))) + linea;
-				return ["", ...logoDegradado(ancho).map(centrar), "", ...consejo.map((c) => centrar(tema.fg("muted", c))), ""];
+				const tarjeta = new Tarjeta(
+					e,
+					() => [
+						[{ t: "1  ", fg: e.c.acentos[0], negrita: true }, { t: "Escribe abajo lo que necesitas, en lenguaje normal, y pulsa Enter o «Enviar ▶».", fg: e.c.texto }],
+						[{ t: "2  ", fg: e.c.acentos[1], negrita: true }, { t: "Usa los botones de arriba del cuadro de texto, o escribe / para ver todos los comandos.", fg: e.c.texto }],
+						[{ t: "3  ", fg: e.c.acentos[2], negrita: true }, { t: "Esc detiene a la IA · la rueda del ratón mueve la conversación · F1 abre el menú.", fg: e.c.texto }],
+					],
+					{ titulo: "Bienvenida" },
+				);
+				const anchoTarjeta = Math.min(ancho - 4, 96);
+				const margen = " ".repeat(Math.max(0, Math.floor((ancho - anchoTarjeta) / 2)));
+				return ["", ...logoDegradado(ancho, e.oscuro).map(centrar), "", ...tarjeta.render(anchoTarjeta).map((l) => margen + l), ""];
 			},
 			invalidate() {},
 		}));
@@ -564,11 +775,14 @@ export default function hilosenda(pi: ExtensionAPI) {
 		if (!ctx.ui.getEditorComponent()) {
 			ctx.ui.setEditorComponent((tui, tema, teclas) => {
 				editor = new EditorHilosenda(tui, tema, teclas);
+				editor.estilo = estiloActual;
+				editor.alMover = limpiarHovers;
 				return editor;
 			});
 		}
 		instalarBarra(ctx);
 		instalarCabecera(ctx);
+		instalarPie(ctx);
 		aplicarModoPermisos(ctx);
 		ctx.ui.setTitle(`hilosenda · ${basename(ctx.cwd) || ctx.cwd}`);
 		ctx.ui.setWorkingMessage("Trabajando… (Esc para detener)");
@@ -578,13 +792,7 @@ export default function hilosenda(pi: ExtensionAPI) {
 			setTimeout(() => ejecutarComando(ctx, alIniciar), 300);
 		}
 		const sinMensajes = !ctx.sessionManager.getEntries().some((e) => e.type === "message");
-		if (sinMensajes && leerPreferencias().modoPrincipiante) {
-			ctx.ui.setWidget(
-				"hilosenda-consejo",
-				[estilo.tenue("Ejemplo: «explicame que hay en esta carpeta» · «crea una pagina web sencilla» · «arregla el error al iniciar»")],
-				{ placement: "belowEditor" },
-			);
-		}
+		if (sinMensajes && leerPreferencias().modoPrincipiante) instalarSugerencias(ctx);
 	});
 
 	const recordar = (_e: unknown, ctx: ExtensionContext) => {
@@ -603,6 +811,7 @@ export default function hilosenda(pi: ExtensionAPI) {
 	});
 	pi.on("input", (_e, ctx) => {
 		ctx.ui.setWidget("hilosenda-consejo", undefined);
+		filaSugerencias = undefined;
 		return undefined;
 	});
 

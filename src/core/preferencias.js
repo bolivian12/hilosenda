@@ -17,6 +17,7 @@ import { archivoPreferencias } from "./rutas.js";
  * @property {boolean} buscarModelosLocales Buscar Ollama, LM Studio, etc. al iniciar.
  * @property {boolean} selectorGrafico Usar la ventana del sistema para elegir carpetas.
  * @property {boolean} animacion Mostrar la animacion de inicio.
+ * @property {"auto" | "oscuro" | "claro" | "pi"} tema Tema de colores del chat.
  * @property {boolean} bienvenidaVista
  */
 
@@ -31,6 +32,7 @@ export const PREFERENCIAS_POR_DEFECTO = {
 	buscarModelosLocales: true,
 	selectorGrafico: true,
 	animacion: true,
+	tema: "auto",
 	bienvenidaVista: false,
 };
 

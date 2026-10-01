@@ -19,27 +19,34 @@ export const LEMA = "tu senda con la IA, hilo a hilo";
 
 const sinColor = Boolean(process.env.NO_COLOR);
 
-// Degradado turquesa → azul → violeta.
+// Degradado turquesa → azul → violeta (mas oscuro para fondos claros).
 const PARADAS = [
 	[45, 212, 191],
 	[56, 189, 248],
 	[129, 140, 248],
 	[192, 132, 252],
 ];
+const PARADAS_CLARO = [
+	[13, 148, 136],
+	[2, 132, 199],
+	[79, 70, 229],
+	[147, 51, 234],
+];
 
 /** Color del degradado en la posicion t (0..1). */
-export function colorDegradado(t) {
-	const x = Math.max(0, Math.min(1, t)) * (PARADAS.length - 1);
-	const i = Math.min(PARADAS.length - 2, Math.floor(x));
+export function colorDegradado(t, oscuro = true) {
+	const paradas = oscuro ? PARADAS : PARADAS_CLARO;
+	const x = Math.max(0, Math.min(1, t)) * (paradas.length - 1);
+	const i = Math.min(paradas.length - 2, Math.floor(x));
 	const f = x - i;
-	return PARADAS[i].map((c, k) => Math.round(c + (PARADAS[i + 1][k] - c) * f));
+	return paradas[i].map((c, k) => Math.round(c + (paradas[i + 1][k] - c) * f));
 }
 
 const pintar = ([r, g, b], texto, negrita = false) =>
 	sinColor ? texto : `\x1b[${negrita ? "1;" : ""}38;2;${r};${g};${b}m${texto}\x1b[0m`;
 
 /** Pinta una linea del logo con el degradado, mostrando solo las primeras `visibles` columnas. */
-export function lineaDegradada(linea, visibles = Infinity, brillo = 0) {
+export function lineaDegradada(linea, visibles = Infinity, brillo = 0, oscuro = true) {
 	const caracteres = [...linea];
 	let salida = "";
 	caracteres.forEach((caracter, i) => {
@@ -47,7 +54,7 @@ export function lineaDegradada(linea, visibles = Infinity, brillo = 0) {
 			salida += " ";
 			return;
 		}
-		const base = colorDegradado(i / Math.max(1, caracteres.length - 1));
+		const base = colorDegradado(i / Math.max(1, caracteres.length - 1), oscuro);
 		const cerca = Number.isFinite(visibles) && visibles - i <= 2;
 		const color = cerca || brillo > 0 ? base.map((c) => Math.min(255, c + (cerca ? 90 : brillo))) : base;
 		salida += pintar(color, caracter, true);
@@ -56,18 +63,19 @@ export function lineaDegradada(linea, visibles = Infinity, brillo = 0) {
 }
 
 /** Logo estatico con degradado (o version corta si no cabe). */
-export function logoDegradado(ancho) {
-	if (ancho < visibleWidth(LOGO_GRANDE[0]) + 2) return [lineaDegradada("hilosenda")];
-	return LOGO_GRANDE.map((l) => lineaDegradada(l));
+export function logoDegradado(ancho, oscuro = true) {
+	if (ancho < visibleWidth(LOGO_GRANDE[0]) + 2) return [lineaDegradada("hilosenda", Infinity, 0, oscuro)];
+	return LOGO_GRANDE.map((l) => lineaDegradada(l, Infinity, 0, oscuro));
 }
 
 const centrar = (linea, ancho) => " ".repeat(Math.max(0, Math.floor((ancho - visibleWidth(linea)) / 2))) + linea;
 
 /** Componente de la animacion. Llama a `alTerminar` al acabar o al saltarla. */
 export class AnimacionInicio {
-	/** @param {{ alTerminar: () => void, alto?: () => number, version?: string }} opciones */
+	/** @param {{ alTerminar: () => void, alto?: () => number, version?: string, oscuro?: boolean }} opciones */
 	constructor(opciones) {
 		this.alTerminar = opciones.alTerminar;
+		this.oscuro = opciones.oscuro ?? true;
 		this.alto = opciones.alto ?? (() => process.stdout.rows || 24);
 		this.version = opciones.version;
 		this.inicio = Date.now();
@@ -111,7 +119,7 @@ export class AnimacionInicio {
 		const columnas = t < 450 ? 0 : Math.ceil(progresoLogo * (anchoLogo + 2));
 		const brillo = t > 1250 && t < 1450 ? Math.round(60 * (1 - (t - 1250) / 200)) : 0;
 		for (const linea of lineasLogo) {
-			lineas.push(columnas > 0 ? centrar(lineaDegradada(linea, progresoLogo >= 1 ? Infinity : columnas, brillo), ancho) : "");
+			lineas.push(columnas > 0 ? centrar(lineaDegradada(linea, progresoLogo >= 1 ? Infinity : columnas, brillo, this.oscuro), ancho) : "");
 		}
 
 		// Fase 1: el hilo que cruza la pantalla, debajo del logo.
@@ -121,7 +129,7 @@ export class AnimacionInicio {
 		let hilo = "";
 		for (let i = 0; i < tramo; i++) {
 			const ondula = (i + Math.floor(t / 60)) % 6 === 0 ? "╌" : "─";
-			hilo += pintar(colorDegradado(i / Math.max(1, largoHilo - 1)), i === tramo - 1 && progresoHilo < 1 ? "●" : ondula);
+			hilo += pintar(colorDegradado(i / Math.max(1, largoHilo - 1), this.oscuro), i === tramo - 1 && progresoHilo < 1 ? "●" : ondula);
 		}
 		lineas.push("");
 		lineas.push(centrar(hilo + " ".repeat(Math.max(0, largoHilo - tramo)), ancho));

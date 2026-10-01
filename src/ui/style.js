@@ -1,98 +1,183 @@
-// Estilos de texto para la consola.
+// Colores y formas de hilosenda.
 //
-// Los componentes de hilosenda reciben un objeto "estilo" en lugar de colores fijos.
-// Fuera de Pi (pantalla de inicio) se usa `estiloBase`; dentro de Pi se construye
-// uno a partir del tema activo con `estiloDesdeTemaPi()`, asi todo combina con el
-// tema claro u oscuro que elija la persona.
+// La consola solo dibuja caracteres, pero combinando colores de 24 bits con los
+// caracteres de bloque (▗ ▄ ▖ ▐ ▌ ▝ ▀ ▘) se consiguen botones con forma de pildora
+// y tarjetas con esquinas redondeadas, como en una aplicacion de escritorio.
+// pi-tui convierte los colores a 256 si la terminal no admite 24 bits.
 
-const CSI = "\x1b[";
-const envolver = (abrir, cerrar) => (texto) => `${CSI}${abrir}m${texto}${CSI}${cerrar}m`;
+import { getTerminalColorMode, mixColors, rgbColor, styleText, visibleWidth } from "@earendil-works/pi-tui";
 
 const sinColor = Boolean(process.env.NO_COLOR);
-const identidad = (texto) => texto;
-const color = (abrir, cerrar) => (sinColor ? identidad : envolver(abrir, cerrar));
+const hex = (valor) => rgbColor(Number.parseInt(valor.slice(1, 3), 16), Number.parseInt(valor.slice(3, 5), 16), Number.parseInt(valor.slice(5, 7), 16));
 
-/**
- * @typedef {"primario" | "normal" | "peligro" | "suave"} TipoBoton
- *
- * @typedef {object} Estilo
- * @property {(t: string) => string} acento
- * @property {(t: string) => string} titulo
- * @property {(t: string) => string} texto
- * @property {(t: string) => string} suave
- * @property {(t: string) => string} tenue
- * @property {(t: string) => string} exito
- * @property {(t: string) => string} aviso
- * @property {(t: string) => string} error
- * @property {(t: string) => string} negrita
- * @property {(t: string) => string} borde
- * @property {(t: string) => string} seleccion
- * @property {(t: string, tipo: TipoBoton, enfocado: boolean, presionado: boolean) => string} boton
- */
-
-/** @type {Estilo} */
-export const estiloBase = {
-	acento: color("38;5;44", "39"),
-	titulo: (t) => (sinColor ? t : `${CSI}1;38;5;44m${t}${CSI}22;39m`),
-	texto: identidad,
-	suave: color("38;5;250", "39"),
-	tenue: color("38;5;244", "39"),
-	exito: color("38;5;114", "39"),
-	aviso: color("38;5;221", "39"),
-	error: color("38;5;203", "39"),
-	negrita: color("1", "22"),
-	borde: color("38;5;240", "39"),
-	seleccion: (t) => (sinColor ? `> ${t}` : `${CSI}48;5;24;38;5;231m${t}${CSI}49;39m`),
-	boton: (t, tipo, enfocado, presionado) => {
-		if (sinColor) return enfocado ? `[>${t}<]` : `[ ${t} ]`;
-		let fondo = "48;5;238";
-		let frente = "38;5;255";
-		if (tipo === "primario") {
-			fondo = "48;5;30";
-			frente = "38;5;231";
-		} else if (tipo === "peligro") {
-			fondo = "48;5;88";
-			frente = "38;5;231";
-		} else if (tipo === "suave") {
-			fondo = "48;5;236";
-			frente = "38;5;250";
-		}
-		if (enfocado) {
-			fondo = "48;5;44";
-			frente = "38;5;16";
-		}
-		if (presionado) {
-			fondo = "48;5;231";
-			frente = "38;5;16";
-		}
-		return `${CSI}${fondo};${frente};1m${t}${CSI}22;39;49m`;
+/** Paletas para fondo oscuro y claro. */
+const PALETAS = {
+	oscuro: {
+		barra: "#1b1f27",
+		tarjeta: "#262b35",
+		tarjetaHover: "#303746",
+		borde: "#3a4150",
+		texto: "#e6e8ee",
+		suave: "#a3abba",
+		tenue: "#6b7383",
+		acento: "#2dd4bf",
+		textoSobreAcento: "#04201d",
+		exito: "#4ade80",
+		aviso: "#fbbf24",
+		error: "#f87171",
+		peligro: "#7f2a33",
+		peligroHover: "#9b3440",
+		seleccion: "#1d3d3b",
+		acentos: ["#2dd4bf", "#38bdf8", "#a78bfa", "#fbbf24", "#f472b6", "#4ade80", "#818cf8", "#fb923c", "#22d3ee", "#e879f9", "#94a3b8"],
+	},
+	claro: {
+		barra: "#e9edf3",
+		tarjeta: "#f1f4f8",
+		tarjetaHover: "#e2e8f0",
+		borde: "#cbd5e1",
+		texto: "#1f2937",
+		suave: "#4b5563",
+		tenue: "#8a94a6",
+		acento: "#0d9488",
+		textoSobreAcento: "#ffffff",
+		exito: "#15803d",
+		aviso: "#b45309",
+		error: "#dc2626",
+		peligro: "#fbe0e0",
+		peligroHover: "#f7caca",
+		seleccion: "#ccfbf1",
+		acentos: ["#0d9488", "#0284c7", "#7c3aed", "#b45309", "#db2777", "#15803d", "#4f46e5", "#ea580c", "#0891b2", "#c026d3", "#64748b"],
 	},
 };
 
 /**
- * Construye un estilo a partir del tema de Pi.
- * @param {any} tema Instancia `Theme` de Pi.
- * @returns {Estilo}
+ * @typedef {"primario" | "normal" | "peligro" | "suave"} TipoBoton
+ * @typedef {"normal" | "hover" | "foco" | "presionado"} EstadoBoton
+ * @typedef {{ t: string, fg?: any, negrita?: boolean, tenue?: boolean, cursiva?: boolean }} Segmento
  */
-export function estiloDesdeTemaPi(tema) {
-	return {
-		acento: (t) => tema.fg("accent", t),
-		titulo: (t) => tema.bold(tema.fg("accent", t)),
-		texto: (t) => tema.fg("text", t),
-		suave: (t) => tema.fg("muted", t),
-		tenue: (t) => tema.fg("dim", t),
-		exito: (t) => tema.fg("success", t),
-		aviso: (t) => tema.fg("warning", t),
-		error: (t) => tema.fg("error", t),
-		negrita: (t) => tema.bold(t),
-		borde: (t) => tema.fg("border", t),
-		seleccion: (t) => tema.bg("selectedBg", tema.fg("accent", t)),
-		boton: (t, tipo, enfocado, presionado) => {
-			if (presionado || enfocado) return tema.inverse(tema.bold(tema.fg("accent", t)));
-			if (tipo === "primario") return tema.bg("toolSuccessBg", tema.bold(tema.fg("success", t)));
-			if (tipo === "peligro") return tema.bg("toolErrorBg", tema.bold(tema.fg("error", t)));
-			if (tipo === "suave") return tema.bg("userMessageBg", tema.fg("muted", t));
-			return tema.bg("selectedBg", tema.bold(tema.fg("text", t)));
-		},
+
+/**
+ * Crea el estilo visual de hilosenda.
+ * @param {{ oscuro?: boolean }} [opciones]
+ */
+export function crearEstilo(opciones = {}) {
+	const oscuro = opciones.oscuro ?? true;
+	const p = PALETAS[oscuro ? "oscuro" : "claro"];
+	const c = {
+		barra: hex(p.barra),
+		tarjeta: hex(p.tarjeta),
+		tarjetaHover: hex(p.tarjetaHover),
+		borde: hex(p.borde),
+		texto: hex(p.texto),
+		suave: hex(p.suave),
+		tenue: hex(p.tenue),
+		acento: hex(p.acento),
+		textoSobreAcento: hex(p.textoSobreAcento),
+		exito: hex(p.exito),
+		aviso: hex(p.aviso),
+		error: hex(p.error),
+		peligro: hex(p.peligro),
+		peligroHover: hex(p.peligroHover),
+		seleccion: hex(p.seleccion),
+		acentos: p.acentos.map(hex),
 	};
+	const modo = getTerminalColorMode();
+
+	/** Pinta texto con colores y atributos. */
+	const pintar = (texto, { fg, bg, negrita, tenue, cursiva, subrayado } = {}) =>
+		sinColor ? texto : styleText(texto, { fg, bg, bold: negrita, dim: tenue, italic: cursiva, underline: subrayado }, modo);
+
+	/** Une segmentos de texto, todos sobre el mismo fondo. */
+	const segmentos = (partes, bg) => partes.map((s) => pintar(s.t, { fg: s.fg ?? c.texto, bg, negrita: s.negrita, tenue: s.tenue, cursiva: s.cursiva })).join("");
+
+	/** Mezcla dos colores (0 = primero, 1 = segundo). */
+	const mezclar = (a, b, cantidad) => mixColors(a, b, cantidad);
+
+	/** Colores de un boton segun su tipo y estado. */
+	function colorBoton(tipo, estado) {
+		let fondo = c.tarjeta;
+		let frente = c.texto;
+		if (tipo === "primario") {
+			fondo = c.acento;
+			frente = c.textoSobreAcento;
+		} else if (tipo === "peligro") {
+			fondo = c.peligro;
+			frente = oscuro ? hex("#ffe4e6") : c.error;
+		} else if (tipo === "suave") {
+			fondo = oscuro ? c.barra : c.tarjeta;
+			frente = c.suave;
+		}
+		if (estado === "hover") {
+			fondo = tipo === "primario" ? mezclar(c.acento, hex(oscuro ? "#ffffff" : "#000000"), 0.18) : tipo === "peligro" ? c.peligroHover : c.tarjetaHover;
+			if (tipo === "suave") frente = c.texto;
+		} else if (estado === "foco") {
+			fondo = tipo === "primario" ? mezclar(c.acento, hex(oscuro ? "#ffffff" : "#000000"), 0.28) : mezclar(c.tarjeta, c.acento, 0.35);
+			frente = tipo === "primario" ? c.textoSobreAcento : oscuro ? hex("#ffffff") : c.texto;
+		} else if (estado === "presionado") {
+			fondo = oscuro ? hex("#ffffff") : c.texto;
+			frente = oscuro ? hex("#0b0d12") : hex("#ffffff");
+		}
+		return { fondo, frente };
+	}
+
+	/** Boton de una linea con extremos redondeados: ▐ texto ▌ */
+	function pastilla(texto, fondo, frente, negrita = true) {
+		if (sinColor) return `[${texto}]`;
+		return pintar("▐", { fg: fondo }) + pintar(texto, { fg: frente, bg: fondo, negrita }) + pintar("▌", { fg: fondo });
+	}
+
+	/**
+	 * Rectangulo relleno con esquinas redondeadas. `interiores` deben venir pintadas
+	 * con el mismo fondo (por ejemplo con `segmentos`). Ocupa `interiores.length + 2` lineas.
+	 */
+	function bloque(interiores, ancho, fondo) {
+		if (sinColor) return [`+${"-".repeat(ancho - 2)}+`, ...interiores.map((l) => `|${l}`), `+${"-".repeat(ancho - 2)}+`];
+		const relleno = (linea) => {
+			const falta = Math.max(0, ancho - visibleWidth(linea));
+			return linea + pintar(" ".repeat(falta), { bg: fondo });
+		};
+		return [
+			pintar(`▗${"▄".repeat(Math.max(0, ancho - 2))}▖`, { fg: fondo }),
+			...interiores.map(relleno),
+			pintar(`▝${"▀".repeat(Math.max(0, ancho - 2))}▘`, { fg: fondo }),
+		];
+	}
+
+	return {
+		oscuro,
+		c,
+		pintar,
+		segmentos,
+		mezclar,
+		colorBoton,
+		pastilla,
+		bloque,
+		// Atajos de texto.
+		acento: (t) => pintar(t, { fg: c.acento }),
+		titulo: (t) => pintar(t, { fg: c.acento, negrita: true }),
+		texto: (t) => pintar(t, { fg: c.texto }),
+		suave: (t) => pintar(t, { fg: c.suave }),
+		tenue: (t) => pintar(t, { fg: c.tenue }),
+		exito: (t) => pintar(t, { fg: c.exito }),
+		aviso: (t) => pintar(t, { fg: c.aviso }),
+		error: (t) => pintar(t, { fg: c.error }),
+		negrita: (t) => pintar(t, { negrita: true }),
+		borde: (t) => pintar(t, { fg: c.borde }),
+		seleccion: (t) => pintar(t, { fg: c.texto, bg: c.seleccion }),
+	};
+}
+
+/** @typedef {ReturnType<typeof crearEstilo>} Estilo */
+
+/** Estilo por defecto (fondo oscuro). */
+export const estiloBase = crearEstilo({ oscuro: true });
+
+/** Decide si un color de fondo es claro (luminancia relativa). */
+export function esFondoClaro(rgb) {
+	if (!rgb) return false;
+	const canal = (v) => {
+		const x = v / 255;
+		return x <= 0.03928 ? x / 12.92 : ((x + 0.055) / 1.055) ** 2.4;
+	};
+	return 0.2126 * canal(rgb.r) + 0.7152 * canal(rgb.g) + 0.0722 * canal(rgb.b) > 0.4;
 }

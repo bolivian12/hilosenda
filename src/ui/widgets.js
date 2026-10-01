@@ -1,7 +1,7 @@
-// Componentes de consola de hilosenda: botones, listas, campos de texto y pantallas.
+// Componentes de consola de hilosenda: botones, tarjetas, listas, campos y pantallas.
 //
-// Todos funcionan con el raton (clic y rueda) y con el teclado (flechas, Tab,
-// Enter, Esc). Se usan tanto en la pantalla de inicio como dentro de Pi.
+// Todos funcionan con el raton (clic, rueda y efecto al pasar por encima) y con el
+// teclado (flechas, Tab, Enter, Esc). Se usan en la pantalla de inicio y dentro de Pi.
 
 import { fuzzyFilter, Input, matchesKey, truncateToWidth, visibleWidth, wrapTextWithAnsi } from "@earendil-works/pi-tui";
 import { logoDegradado } from "./animacion.js";
@@ -31,10 +31,63 @@ export function acortarRuta(ruta, ancho) {
 	return truncateToWidth(`…/${salida}`, ancho, "…");
 }
 
+/** Recorta texto a `ancho` columnas con "…". Para texto sin colores no agrega codigos de escape. */
+export function recortar(texto, ancho) {
+	if (ancho <= 0) return "";
+	if (visibleWidth(texto) <= ancho) return texto;
+	if (texto.includes("\x1b")) return truncateToWidth(texto, ancho, "…");
+	let salida = "";
+	let usado = 0;
+	for (const caracter of texto) {
+		const w = visibleWidth(caracter);
+		if (usado + w > ancho - 1) break;
+		salida += caracter;
+		usado += w;
+	}
+	return `${salida}…`;
+}
 const esImprimible = (data) => data.length > 0 && !data.startsWith("\x1b") && !/[\x00-\x1f\x7f]/.test(data);
+const esClicIzquierdo = (e) => e.button === "left" && (e.type === "press" || e.type === "release" || e.type === "click");
+
+/** Estado visual de un elemento pulsable. */
+function estadoDe(indice, { presionado, enfocado, foco, hover }) {
+	if (presionado === indice) return "presionado";
+	if (enfocado && foco === indice) return "foco";
+	if (hover === indice) return "hover";
+	return "normal";
+}
+
+/**
+ * Logica comun de raton para elementos pulsables con zonas.
+ * El componente debe tener `zonas`, `hover`, `presionado`, `indice` y `pulsar(indice)`.
+ */
+function ratonPulsable(componente, evento) {
+	const zona = componente.zonas.find((z) => evento.y >= z.y0 && evento.y <= z.y1 && evento.x >= z.x0 && evento.x <= z.x1);
+	if (evento.type === "move" || evento.type === "drag") {
+		const nuevo = zona ? zona.indice : -1;
+		if (nuevo !== componente.hover) {
+			componente.hover = nuevo;
+			return { handled: true, render: true };
+		}
+		return zona ? { handled: true, render: false } : undefined;
+	}
+	if (!esClicIzquierdo(evento)) return undefined;
+	if (evento.type === "press") {
+		componente.presionado = zona ? zona.indice : -1;
+		if (zona) componente.indice = zona.indice;
+		return zona ? { handled: true, capture: true } : undefined;
+	}
+	const presionado = componente.presionado;
+	componente.presionado = -1;
+	if (zona && zona.indice === presionado) {
+		componente.pulsar(zona.indice);
+		return { handled: true, render: true };
+	}
+	return presionado >= 0 ? { handled: true, render: true } : undefined;
+}
 
 // ---------------------------------------------------------------------------
-// Texto
+// Texto y decoracion
 // ---------------------------------------------------------------------------
 
 /** Parrafo de texto que se ajusta al ancho disponible. */
@@ -58,7 +111,7 @@ export class Parrafo {
 	invalidate() {}
 }
 
-/** Titulo de seccion: "── Titulo ─────". */
+/** Titulo de seccion: "TITULO ─────". */
 export class Seccion {
 	constructor(estilo, titulo) {
 		this.estilo = estilo;
@@ -66,9 +119,9 @@ export class Seccion {
 	}
 
 	render(ancho) {
-		const cabeza = `── ${this.titulo} `;
-		const resto = Math.max(0, ancho - visibleWidth(cabeza));
-		return ["", this.estilo.borde("── ") + this.estilo.titulo(this.titulo) + this.estilo.borde(` ${"─".repeat(resto)}`)];
+		const etiqueta = this.titulo.toUpperCase();
+		const resto = Math.max(0, ancho - visibleWidth(etiqueta) - 1);
+		return ["", this.estilo.pintar(etiqueta, { fg: this.estilo.c.tenue, negrita: true }) + this.estilo.borde(` ${"─".repeat(resto)}`)];
 	}
 
 	invalidate() {}
@@ -83,9 +136,39 @@ export class Logo {
 
 	render(ancho) {
 		const lineas = [""];
-		for (const fila of logoDegradado(ancho)) lineas.push(centrar(fila, ancho));
+		for (const fila of logoDegradado(ancho, this.estilo.oscuro)) lineas.push(centrar(fila, ancho));
 		if (this.subtitulo) lineas.push(centrar(this.estilo.suave(this.subtitulo), ancho));
 		return lineas;
+	}
+
+	invalidate() {}
+}
+
+/** Tarjeta redondeada con un titulo pequeño y lineas de contenido. */
+export class Tarjeta {
+	/**
+	 * @param {import("./style.js").Estilo} estilo
+	 * @param {(anchoInterior: number) => Array<import("./style.js").Segmento[]>} contenido Filas de segmentos.
+	 * @param {{ titulo?: string }} [opciones]
+	 */
+	constructor(estilo, contenido, opciones = {}) {
+		this.estilo = estilo;
+		this.contenido = contenido;
+		this.titulo = opciones.titulo;
+	}
+
+	render(ancho) {
+		const e = this.estilo;
+		const fondo = e.c.tarjeta;
+		const interior = Math.max(4, ancho - 4);
+		const filas = [];
+		if (this.titulo) filas.push([{ t: this.titulo.toUpperCase(), fg: e.c.tenue, negrita: true }]);
+		filas.push(...this.contenido(interior));
+		const lineas = filas.map((segmentos) => {
+			const texto = e.segmentos([{ t: "  " }, ...segmentos], fondo);
+			return visibleWidth(texto) > ancho ? truncateToWidth(texto, ancho - 1, "…") : texto;
+		});
+		return e.bloque(lineas, ancho, fondo);
 	}
 
 	invalidate() {}
@@ -99,16 +182,17 @@ export class Logo {
  * @typedef {object} Boton
  * @property {string} id
  * @property {string} etiqueta
+ * @property {string} [icono]
  * @property {import("./style.js").TipoBoton} [tipo]
- * @property {string} [ayuda] Explicacion que se muestra al enfocar el boton.
+ * @property {string} [ayuda] Explicacion que se muestra al enfocar o pasar el raton.
  */
 
-/** Fila de botones clicables. Se reparte en varias lineas si no cabe. */
+/** Fila de botones con forma de pildora. Se reparte en varias lineas si no cabe. */
 export class FilaBotones {
 	/**
 	 * @param {import("./style.js").Estilo} estilo
 	 * @param {Boton[]} botones
-	 * @param {{ grande?: boolean, centrado?: boolean, mostrarAyuda?: boolean, alPulsar?: (id: string) => void }} [opciones]
+	 * @param {{ grande?: boolean, centrado?: boolean, mostrarAyuda?: boolean, derechaDesde?: number, alPulsar?: (id: string) => void }} [opciones]
 	 */
 	constructor(estilo, botones, opciones = {}) {
 		this.estilo = estilo;
@@ -116,11 +200,13 @@ export class FilaBotones {
 		this.grande = opciones.grande ?? false;
 		this.centrado = opciones.centrado ?? false;
 		this.mostrarAyuda = opciones.mostrarAyuda ?? false;
+		this.derechaDesde = opciones.derechaDesde;
 		this.alPulsar = opciones.alPulsar;
 		this.interactivo = true;
 		this.enfocado = false;
 		this.indice = 0;
 		this.presionado = -1;
+		this.hover = -1;
 		/** @type {Array<{ y0: number, y1: number, x0: number, x1: number, indice: number, banda: number }>} */
 		this.zonas = [];
 	}
@@ -132,16 +218,27 @@ export class FilaBotones {
 
 	invalidate() {}
 
+	quitarHover() {
+		if (this.hover === -1) return false;
+		this.hover = -1;
+		return true;
+	}
+
+	textoDe(boton, ancho) {
+		const relleno = this.grande ? "   " : " ";
+		const texto = `${relleno}${boton.icono ? `${boton.icono}  ` : ""}${boton.etiqueta}${relleno}`;
+		return recortar(texto, this.grande ? ancho : ancho - 2);
+	}
+
 	render(ancho) {
-		const relleno = this.grande ? 3 : 1;
-		const separacion = 2;
+		const e = this.estilo;
+		const separacion = this.grande ? 2 : 1;
 		/** @type {Array<Array<{ indice: number, texto: string, ancho: number }>>} */
 		const bandas = [[]];
 		let usado = 0;
 		this.botones.forEach((boton, indice) => {
-			let texto = `${espacios(relleno)}${boton.etiqueta}${espacios(relleno)}`;
-			if (visibleWidth(texto) > ancho) texto = truncateToWidth(texto, ancho, "…");
-			const w = visibleWidth(texto);
+			const texto = this.textoDe(boton, ancho);
+			const w = visibleWidth(texto) + (this.grande ? 0 : 2);
 			const banda = bandas[bandas.length - 1];
 			const necesario = banda.length === 0 ? w : usado + separacion + w;
 			if (banda.length > 0 && necesario > ancho) {
@@ -155,33 +252,48 @@ export class FilaBotones {
 
 		const lineas = [];
 		this.zonas = [];
-		const altoBanda = this.grande ? 3 : 1;
+		const alto = this.grande ? 3 : 1;
+		const estados = { presionado: this.presionado, enfocado: this.enfocado, foco: this.indice, hover: this.hover };
 		bandas.forEach((banda, numeroBanda) => {
 			if (banda.length === 0) return;
-			const total = banda.reduce((suma, b) => suma + b.ancho, 0) + separacion * (banda.length - 1);
-			const inicio = this.centrado ? Math.max(0, Math.floor((ancho - total) / 2)) : 0;
-			const filas = Array.from({ length: altoBanda }, () => espacios(inicio));
+			const total = banda.reduce((s, b) => s + b.ancho, 0) + separacion * (banda.length - 1);
+			// Posicion x de cada boton.
+			const posiciones = [];
+			let x = this.centrado ? Math.max(0, Math.floor((ancho - total) / 2)) : 0;
+			const derecha = this.derechaDesde !== undefined && bandas.length === 1 ? banda.findIndex((b) => b.indice >= this.derechaDesde) : -1;
+			banda.forEach((b, i) => {
+				if (i === derecha && derecha > 0) {
+					const restante = banda.slice(i).reduce((s, r) => s + r.ancho, 0) + separacion * (banda.length - i - 1);
+					x = Math.max(x, ancho - restante);
+				}
+				posiciones.push(x);
+				x += b.ancho + separacion;
+			});
+
+			const filas = Array.from({ length: alto }, () => "");
 			const y0 = lineas.length;
-			let x = inicio;
+			let cursor = 0;
 			banda.forEach((b, i) => {
 				const boton = this.botones[b.indice];
-				const enfocado = this.enfocado && this.indice === b.indice;
-				const presionado = this.presionado === b.indice;
-				const pintar = (t) => this.estilo.boton(t, boton.tipo ?? "normal", enfocado, presionado);
-				for (let fila = 0; fila < altoBanda; fila++) {
-					const contenido = altoBanda === 3 && fila !== 1 ? espacios(b.ancho) : b.texto;
-					filas[fila] += pintar(contenido) + (i < banda.length - 1 ? espacios(separacion) : "");
+				const { fondo, frente } = e.colorBoton(boton.tipo ?? "normal", estadoDe(b.indice, estados));
+				const hueco = espacios(posiciones[i] - cursor);
+				if (this.grande) {
+					const forma = e.bloque([e.pintar(b.texto, { fg: frente, bg: fondo, negrita: true })], b.ancho, fondo);
+					for (let f = 0; f < alto; f++) filas[f] += hueco + forma[f];
+				} else {
+					filas[0] += hueco + e.pastilla(b.texto, fondo, frente, boton.tipo !== "suave");
 				}
-				this.zonas.push({ y0, y1: y0 + altoBanda - 1, x0: x, x1: x + b.ancho - 1, indice: b.indice, banda: numeroBanda });
-				x += b.ancho + separacion;
+				cursor = posiciones[i] + b.ancho;
+				this.zonas.push({ y0, y1: y0 + alto - 1, x0: posiciones[i], x1: posiciones[i] + b.ancho - 1, indice: b.indice, banda: numeroBanda });
 			});
 			lineas.push(...filas);
 			if (this.grande && numeroBanda < bandas.length - 1) lineas.push("");
 		});
 
 		if (this.mostrarAyuda) {
-			const ayuda = this.enfocado ? this.botones[this.indice]?.ayuda : undefined;
-			lineas.push(ayuda ? this.estilo.suave(truncateToWidth(`  ${ayuda}`, ancho, "…")) : "");
+			const visible = this.hover >= 0 ? this.hover : this.enfocado ? this.indice : -1;
+			const ayuda = this.botones[visible]?.ayuda;
+			lineas.push(ayuda ? e.suave(recortar(`  ${ayuda}`, ancho)) : "");
 		}
 		return lineas;
 	}
@@ -222,28 +334,135 @@ export class FilaBotones {
 		if (boton) this.alPulsar?.(boton.id);
 	}
 
-	zonaEn(x, y) {
-		return this.zonas.find((z) => y >= z.y0 && y <= z.y1 && x >= z.x0 && x <= z.x1);
+	handleMouse(evento) {
+		return ratonPulsable(this, evento);
+	}
+}
+
+/**
+ * @typedef {object} Mosaico
+ * @property {string} id
+ * @property {string} titulo
+ * @property {string} [descripcion]
+ * @property {string} [icono]
+ * @property {number} [color] Indice en la paleta de acentos.
+ */
+
+/** Cuadricula de tarjetas pulsables, como los accesos de una aplicacion. */
+export class Mosaico {
+	/**
+	 * @param {import("./style.js").Estilo} estilo
+	 * @param {Array<{ id: string, titulo: string, descripcion?: string, icono?: string, color?: number }>} elementos
+	 * @param {{ alPulsar?: (id: string) => void, anchoMinimo?: number, columnasMax?: number }} [opciones]
+	 */
+	constructor(estilo, elementos, opciones = {}) {
+		this.estilo = estilo;
+		this.elementos = elementos;
+		this.alPulsar = opciones.alPulsar;
+		this.anchoMinimo = opciones.anchoMinimo ?? 26;
+		this.columnasMax = opciones.columnasMax ?? 4;
+		this.interactivo = true;
+		this.enfocado = false;
+		this.indice = 0;
+		this.presionado = -1;
+		this.hover = -1;
+		this.columnas = 1;
+		this.zonas = [];
+	}
+
+	invalidate() {}
+
+	quitarHover() {
+		if (this.hover === -1) return false;
+		this.hover = -1;
+		return true;
+	}
+
+	render(ancho) {
+		const e = this.estilo;
+		const separacion = 2;
+		const columnas = Math.max(1, Math.min(this.columnasMax, this.elementos.length, Math.floor((ancho + separacion) / (this.anchoMinimo + separacion))));
+		this.columnas = columnas;
+		const w = Math.floor((ancho - separacion * (columnas - 1)) / columnas);
+		const lineas = [];
+		this.zonas = [];
+		const estados = { presionado: this.presionado, enfocado: this.enfocado, foco: this.indice, hover: this.hover };
+		for (let inicio = 0; inicio < this.elementos.length; inicio += columnas) {
+			const fila = this.elementos.slice(inicio, inicio + columnas);
+			const y0 = lineas.length;
+			const formas = fila.map((el, i) => {
+				const indice = inicio + i;
+				const color = e.c.acentos[(el.color ?? indice) % e.c.acentos.length];
+				const estado = estadoDe(indice, estados);
+				const fondo =
+					estado === "presionado" ? e.mezclar(e.c.tarjeta, color, 0.55) : estado === "foco" ? e.mezclar(e.c.tarjeta, color, 0.3) : estado === "hover" ? e.c.tarjetaHover : e.c.tarjeta;
+				const destacado = estado !== "normal";
+				const titulo = recortar(el.titulo, w - 7);
+				const flecha = destacado ? "›" : " ";
+				const linea1 = e.segmentos(
+					[
+						{ t: "  " },
+						{ t: el.icono ?? "•", fg: color, negrita: true },
+						{ t: "  " },
+						{ t: titulo, fg: destacado && e.oscuro ? e.c.texto : e.c.texto, negrita: true },
+						{ t: espacios(Math.max(0, w - 7 - visibleWidth(titulo))) },
+						{ t: flecha, fg: color, negrita: true },
+					],
+					fondo,
+				);
+				const linea2 = e.segmentos([{ t: "     " }, { t: recortar(el.descripcion ?? "", w - 7), fg: destacado ? e.c.texto : e.c.suave }], fondo);
+				this.zonas.push({ y0, y1: y0 + 3, x0: i * (w + separacion), x1: i * (w + separacion) + w - 1, indice, fila: inicio / columnas });
+				return e.bloque([linea1, linea2], w, fondo);
+			});
+			for (let f = 0; f < 4; f++) lineas.push(formas.map((forma) => forma[f]).join(espacios(separacion)));
+		}
+		return lineas;
+	}
+
+	pulsar(indice) {
+		const el = this.elementos[indice];
+		if (el) this.alPulsar?.(el.id);
+	}
+
+	handleInput(data) {
+		const total = this.elementos.length;
+		const col = this.indice % this.columnas;
+		if (matchesKey(data, "left")) {
+			if (col === 0) return false;
+			this.indice--;
+			return true;
+		}
+		if (matchesKey(data, "right")) {
+			if (col === this.columnas - 1 || this.indice >= total - 1) return false;
+			this.indice++;
+			return true;
+		}
+		if (matchesKey(data, "up")) {
+			if (this.indice - this.columnas < 0) return false;
+			this.indice -= this.columnas;
+			return true;
+		}
+		if (matchesKey(data, "down")) {
+			if (this.indice + this.columnas >= total) {
+				// Ultima fila incompleta: bajar a la ultima tarjeta si hay otra fila.
+				const filaActual = Math.floor(this.indice / this.columnas);
+				const ultimaFila = Math.floor((total - 1) / this.columnas);
+				if (filaActual === ultimaFila) return false;
+				this.indice = total - 1;
+				return true;
+			}
+			this.indice += this.columnas;
+			return true;
+		}
+		if (matchesKey(data, "enter") || data === " ") {
+			this.pulsar(this.indice);
+			return true;
+		}
+		return false;
 	}
 
 	handleMouse(evento) {
-		if (evento.button !== "left") return undefined;
-		const zona = this.zonaEn(evento.x, evento.y);
-		if (evento.type === "press") {
-			this.presionado = zona ? zona.indice : -1;
-			if (zona) this.indice = zona.indice;
-			return zona ? { handled: true, capture: true } : undefined;
-		}
-		if (evento.type === "release" || evento.type === "click") {
-			const presionado = this.presionado;
-			this.presionado = -1;
-			if (zona && zona.indice === presionado) {
-				this.pulsar(zona.indice);
-				return { handled: true, render: true };
-			}
-			return presionado >= 0 ? { handled: true, render: true } : undefined;
-		}
-		return undefined;
+		return ratonPulsable(this, evento);
 	}
 }
 
@@ -280,6 +499,7 @@ export class Lista {
 		this.consulta = "";
 		this.seleccion = 0;
 		this.desplazamiento = 0;
+		this.hover = -1;
 		this.zonas = [];
 		this.setElementos(elementos);
 		if (opciones.inicial !== undefined) this.seleccion = Math.max(0, this.visibles.findIndex((e) => e.id === opciones.inicial));
@@ -305,6 +525,12 @@ export class Lista {
 
 	invalidate() {}
 
+	quitarHover() {
+		if (this.hover === -1) return false;
+		this.hover = -1;
+		return true;
+	}
+
 	/** Filas a dibujar: titulos de grupo y elementos. */
 	filas() {
 		const filas = [];
@@ -320,18 +546,21 @@ export class Lista {
 	}
 
 	render(ancho) {
+		const e = this.estilo;
 		const lineas = [];
 		this.zonas = [];
 		if (this.buscador) {
-			const cursor = this.enfocado ? this.estilo.acento("▏") : "";
-			const texto = this.consulta
-				? this.estilo.texto(this.consulta) + cursor
-				: cursor + this.estilo.tenue("escribe para buscar…");
-			lineas.push(rellenar(`${this.estilo.acento(" Buscar: ")}${texto}`, ancho));
+			const fondo = this.enfocado ? e.mezclar(e.c.tarjeta, e.c.acento, 0.12) : e.c.tarjeta;
+			const cursor = this.enfocado ? { t: "▏", fg: e.c.acento } : { t: "" };
+			const contenido = this.consulta ? [{ t: this.consulta, fg: e.c.texto }, cursor] : [cursor, { t: "escribe para buscar…", fg: e.c.tenue }];
+			const interior = e.segmentos([{ t: " ⌕ ", fg: e.c.acento, negrita: true }, ...contenido], fondo);
+			const relleno = e.pintar(espacios(Math.max(0, ancho - 2 - visibleWidth(interior))), { bg: fondo });
+			lineas.push(e.pintar("▐", { fg: fondo }) + interior + relleno + e.pintar("▌", { fg: fondo }));
+			lineas.push("");
 			this.zonas.push({ tipo: "buscador", y: 0 });
 		}
 		if (this.visibles.length === 0) {
-			lineas.push(this.estilo.suave(`  ${this.consulta ? "Nada coincide con la busqueda." : this.vacio}`));
+			lineas.push(e.suave(`  ${this.consulta ? "Nada coincide con la busqueda." : this.vacio}`));
 			return lineas;
 		}
 
@@ -342,37 +571,38 @@ export class Lista {
 		if (filaSeleccion >= this.desplazamiento + alto) this.desplazamiento = filaSeleccion - alto + 1;
 		this.desplazamiento = Math.max(0, Math.min(this.desplazamiento, Math.max(0, filas.length - alto)));
 
-		const anchoEtiqueta = Math.min(
-			Math.max(...this.visibles.map((e) => visibleWidth(e.etiqueta))) + 2,
-			Math.max(12, Math.floor(ancho * 0.5)),
-		);
+		const anchoEtiqueta = Math.min(Math.max(...this.visibles.map((x) => visibleWidth(x.etiqueta))) + 3, Math.max(12, Math.floor(ancho * 0.5)));
 
 		if (this.desplazamiento > 0) {
-			lineas.push(this.estilo.acento(`  ▲ ${this.desplazamiento} mas arriba (clic o rueda)`));
+			lineas.push(e.acento(`   ▲ ${this.desplazamiento} mas arriba`));
 			this.zonas.push({ tipo: "arriba", y: lineas.length - 1 });
 		}
 		for (const fila of filas.slice(this.desplazamiento, this.desplazamiento + alto)) {
 			if (fila.grupo !== undefined) {
-				lineas.push(this.estilo.negrita(this.estilo.suave(` ${fila.grupo}`)));
+				const etiqueta = ` ${fila.grupo.toUpperCase()} `;
+				lineas.push(e.pintar(etiqueta, { fg: e.c.tenue, negrita: true }) + e.borde("─".repeat(Math.max(0, ancho - visibleWidth(etiqueta)))));
 				continue;
 			}
 			const elegido = fila.indice === this.seleccion;
-			const marca = elegido ? "▶ " : "  ";
-			const etiqueta = rellenar(truncateToWidth(fila.elemento.etiqueta, anchoEtiqueta - 2, "…"), anchoEtiqueta);
-			const resto = Math.max(0, ancho - 2 - anchoEtiqueta);
-			const detalle = fila.elemento.detalle ? truncateToWidth(fila.elemento.detalle, resto, "…") : "";
-			let linea;
-			if (elegido) {
-				linea = this.estilo.seleccion(rellenar(`${marca}${etiqueta}${detalle}`, ancho));
-			} else {
-				linea = `${marca}${this.estilo.texto(etiqueta)}${this.estilo.suave(detalle)}`;
-			}
+			const encima = fila.indice === this.hover;
+			const fondo = elegido ? e.c.seleccion : encima ? e.c.tarjetaHover : undefined;
+			const etiqueta = rellenar(recortar(fila.elemento.etiqueta, anchoEtiqueta - 2), anchoEtiqueta);
+			const resto = Math.max(0, ancho - 3 - anchoEtiqueta);
+			const detalle = fila.elemento.detalle ? recortar(fila.elemento.detalle, resto) : "";
+			const partes = [
+				{ t: elegido ? "▌" : " ", fg: e.c.acento },
+				{ t: "  " },
+				{ t: etiqueta, fg: e.c.texto, negrita: elegido },
+				{ t: detalle, fg: elegido ? e.c.texto : e.c.suave },
+			];
+			let linea = fondo ? e.segmentos(partes, fondo) : e.segmentos(partes, undefined);
+			if (fondo) linea += e.pintar(espacios(Math.max(0, ancho - visibleWidth(linea))), { bg: fondo });
 			lineas.push(linea);
 			this.zonas.push({ tipo: "elemento", y: lineas.length - 1, indice: fila.indice });
 		}
 		const debajo = filas.length - (this.desplazamiento + alto);
 		if (debajo > 0) {
-			lineas.push(this.estilo.acento(`  ▼ ${debajo} mas abajo (clic o rueda)`));
+			lineas.push(e.acento(`   ▼ ${debajo} mas abajo`));
 			this.zonas.push({ tipo: "abajo", y: lineas.length - 1 });
 		}
 		return lineas;
@@ -435,8 +665,14 @@ export class Lista {
 			this.mover(evento.wheelDelta < 0 ? -1 : 1);
 			return { handled: true, render: true };
 		}
-		if (evento.button !== "left" || (evento.type !== "click" && evento.type !== "press")) return undefined;
 		const zona = this.zonas.find((z) => z.y === evento.y);
+		if (evento.type === "move" || evento.type === "drag") {
+			const nuevo = zona?.tipo === "elemento" ? zona.indice : -1;
+			if (nuevo === this.hover) return zona ? { handled: true, render: false } : undefined;
+			this.hover = nuevo;
+			return { handled: true, render: true };
+		}
+		if (evento.button !== "left" || (evento.type !== "click" && evento.type !== "press")) return undefined;
 		if (!zona) return undefined;
 		if (evento.type === "press") return { handled: true };
 		if (zona.tipo === "arriba") this.mover(-Math.max(1, this.alto - 1));
@@ -508,11 +744,12 @@ export class Campo {
 	}
 
 	render(ancho) {
-		const marco = this.enfocado ? this.estilo.acento : this.estilo.borde;
+		const e = this.estilo;
+		const marco = (t) => e.pintar(t, { fg: this.enfocado ? e.c.acento : e.c.borde });
 		const interior = Math.max(4, ancho - 4);
 		const linea = this.input.render(interior)[0] ?? "";
 		return [
-			this.estilo.negrita(this.etiqueta),
+			e.pintar(this.etiqueta, { fg: e.c.texto, negrita: true }),
 			marco(`╭${"─".repeat(interior + 2)}╮`),
 			`${marco("│")}${rellenar(linea, interior + 2)}${marco("│")}`,
 			marco(`╰${"─".repeat(interior + 2)}╯`),
@@ -542,19 +779,22 @@ export class Campo {
 // ---------------------------------------------------------------------------
 
 /**
- * Contenedor vertical que reparte el foco entre sus elementos interactivos.
- * Tab / Shift+Tab y las flechas pasan de un elemento a otro; Esc llama a `alSalir`.
+ * Contenedor vertical con barra de titulo, como una ventana. Reparte el foco entre
+ * sus elementos interactivos: Tab / Shift+Tab y flechas pasan de uno a otro; Esc o
+ * el boton ✕ llaman a `alSalir`.
  */
 export class Pantalla {
 	/**
 	 * @param {import("./style.js").Estilo} estilo
-	 * @param {{ titulo?: string, pie?: string, alSalir?: () => void }} [opciones]
+	 * @param {{ titulo?: string, pie?: string, alSalir?: () => void, alto?: () => number }} [opciones]
+	 *   `alto`: si se indica, la pantalla ocupa toda esa altura y el pie queda abajo como barra de estado.
 	 */
 	constructor(estilo, opciones = {}) {
 		this.estilo = estilo;
 		this.titulo = opciones.titulo;
 		this.pie = opciones.pie ?? "Clic en un boton · Flechas y Enter · Esc para volver";
 		this.alSalir = opciones.alSalir;
+		this.alto = opciones.alto;
 		/** @type {any[]} */
 		this.hijos = [];
 		this.foco = -1;
@@ -563,6 +803,9 @@ export class Pantalla {
 		/** @type {{ requestRender(): void } | undefined} */
 		this.tui = undefined;
 		this.margen = 2;
+		this.hoverCerrar = false;
+		this.zonaCerrar = undefined;
+		this.inicioHijos = 0;
 	}
 
 	agregar(componente) {
@@ -590,14 +833,24 @@ export class Pantalla {
 		for (const hijo of this.hijos) hijo.invalidate?.();
 	}
 
+	barraTitulo(ancho) {
+		const e = this.estilo;
+		const fondo = e.c.barra;
+		const izquierda = e.segmentos([{ t: "  ◆ ", fg: e.c.acento, negrita: true }, { t: recortar(this.titulo, ancho - 10), fg: e.c.texto, negrita: true }], fondo);
+		const cerrar = e.segmentos([{ t: " ✕ ", fg: this.hoverCerrar ? e.c.error : e.c.suave, negrita: this.hoverCerrar }, { t: " " }], fondo);
+		const hueco = Math.max(0, ancho - visibleWidth(izquierda) - visibleWidth(cerrar));
+		this.zonaCerrar = { x0: ancho - 4, x1: ancho - 2 };
+		return izquierda + e.pintar(espacios(hueco), { bg: fondo }) + cerrar;
+	}
+
 	render(anchoTotal) {
+		const e = this.estilo;
 		const ancho = Math.max(10, anchoTotal - this.margen * 2);
 		const sangria = espacios(this.margen);
 		const lineas = [];
 		if (this.titulo) {
+			lineas.push(this.barraTitulo(anchoTotal));
 			lineas.push("");
-			lineas.push(sangria + this.estilo.titulo(this.titulo));
-			lineas.push(sangria + this.estilo.borde("─".repeat(ancho)));
 		}
 		this.inicioHijos = lineas.length;
 		this.alturas = [];
@@ -608,12 +861,20 @@ export class Pantalla {
 		}
 		lineas.push("");
 		if (this.mensaje) {
-			const pintar =
-				this.mensaje.tipo === "error" ? this.estilo.error : this.mensaje.tipo === "aviso" ? this.estilo.aviso : this.estilo.exito;
-			for (const linea of wrapTextWithAnsi(this.mensaje.texto, ancho)) lineas.push(sangria + pintar(linea));
+			const color = this.mensaje.tipo === "error" ? e.c.error : this.mensaje.tipo === "aviso" ? e.c.aviso : e.c.exito;
+			const icono = this.mensaje.tipo === "error" ? "✕" : this.mensaje.tipo === "aviso" ? "!" : "✓";
+			for (const linea of wrapTextWithAnsi(`${icono}  ${this.mensaje.texto}`, ancho)) lineas.push(sangria + e.pintar(linea, { fg: color }));
 			lineas.push("");
 		}
-		if (this.pie) lineas.push(sangria + this.estilo.tenue(truncateToWidth(this.pie, ancho, "…")));
+		if (!this.pie) return lineas;
+		if (this.alto) {
+			const total = this.alto();
+			while (lineas.length < total - 1) lineas.push("");
+			const barra = e.segmentos([{ t: `  ${recortar(this.pie, anchoTotal - 4)}`, fg: e.c.suave }], e.c.barra);
+			lineas.push(barra + e.pintar(espacios(Math.max(0, anchoTotal - visibleWidth(barra))), { bg: e.c.barra }));
+		} else {
+			lineas.push(sangria + e.tenue(recortar(this.pie, ancho)));
+		}
 		return lineas;
 	}
 
@@ -642,13 +903,41 @@ export class Pantalla {
 		if (usado) this.pedirRender();
 	}
 
+	/** Quita el efecto de raton de todos los hijos excepto `excepto`. */
+	limpiarHover(excepto) {
+		let cambio = false;
+		for (const hijo of this.hijos) if (hijo !== excepto && hijo.quitarHover?.()) cambio = true;
+		return cambio;
+	}
+
 	handleMouse(evento) {
-		const margenSuperior = this.inicioHijos ?? 0;
-		let y = margenSuperior;
+		const esMovimiento = evento.type === "move" || evento.type === "drag";
+
+		// Boton ✕ de la barra de titulo.
+		if (this.titulo && evento.y === 0 && this.zonaCerrar) {
+			const sobreCerrar = evento.x >= this.zonaCerrar.x0 && evento.x <= this.zonaCerrar.x1;
+			if (esMovimiento) {
+				const cambio = this.hoverCerrar !== sobreCerrar || this.limpiarHover();
+				this.hoverCerrar = sobreCerrar;
+				if (cambio) this.pedirRender();
+				return { handled: true, render: cambio };
+			}
+			if (sobreCerrar && evento.button === "left") {
+				if (evento.type === "click") this.alSalir?.();
+				return { handled: true };
+			}
+		}
+		if (esMovimiento && this.hoverCerrar) {
+			this.hoverCerrar = false;
+			this.pedirRender();
+		}
+
+		let y = this.inicioHijos;
 		for (let i = 0; i < this.hijos.length; i++) {
 			const alto = this.alturas[i] ?? 0;
 			if (evento.y >= y && evento.y < y + alto) {
 				const hijo = this.hijos[i];
+				const limpiado = esMovimiento ? this.limpiarHover(hijo) : false;
 				const resultado = hijo.handleMouse?.({
 					...evento,
 					x: evento.x - this.margen,
@@ -658,12 +947,18 @@ export class Pantalla {
 				});
 				if (resultado) {
 					if (hijo.interactivo && evento.type === "press") this.enfocar(i);
-					this.pedirRender();
-					return { handled: true, capture: resultado.capture, render: true };
+					if (!esMovimiento || resultado.render || limpiado) this.pedirRender();
+					return { handled: true, capture: resultado.capture, render: !esMovimiento || resultado.render || limpiado };
 				}
-				return undefined;
+				if (limpiado) this.pedirRender();
+				return limpiado ? { handled: true, render: true } : undefined;
 			}
 			y += alto;
+		}
+		if (esMovimiento) {
+			const cambio = this.limpiarHover();
+			if (cambio) this.pedirRender();
+			return cambio ? { handled: true, render: true } : undefined;
 		}
 		if (evento.type === "wheel") {
 			const hijo = this.hijos[this.foco];

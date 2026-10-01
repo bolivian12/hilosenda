@@ -18,8 +18,8 @@ import { elegirCarpeta, nombreCorto } from "../flujos/explorar.js";
 import { elegirPermisos, gestionarInstrucciones, NIVELES, PERMISOS } from "../flujos/opciones.js";
 import { AnimacionInicio } from "../ui/animacion.js";
 import { crearDialogos } from "../ui/dialogos.js";
-import { estiloBase } from "../ui/style.js";
-import { acortarRuta, FilaBotones, Logo, Pantalla, Parrafo, Seccion } from "../ui/widgets.js";
+import { crearEstilo, esFondoClaro } from "../ui/style.js";
+import { acortarRuta, FilaBotones, Logo, Mosaico, Pantalla, Parrafo, Tarjeta } from "../ui/widgets.js";
 import { AYUDA_GENERAL } from "../textos.js";
 
 /** "hace 5 min", "ayer", "12/03/2026". */
@@ -50,8 +50,8 @@ const rutaBonita = (ruta) => (ruta.startsWith(homedir()) ? `~${ruta.slice(homedi
 export class App {
 	/** @param {{ carpeta?: string, animacion?: boolean }} opciones */
 	constructor(opciones = {}) {
-		this.estilo = estiloBase;
 		this.preferencias = leerPreferencias();
+		this.usarEstilo(this.preferencias.tema === "claro" ? false : true);
 		const desdeConsola = process.cwd() !== homedir() ? process.cwd() : undefined;
 		this.carpeta = opciones.carpeta ?? desdeConsola ?? recientesExistentes()[0]?.ruta;
 		this.animacion = opciones.animacion ?? this.preferencias.animacion !== false;
@@ -60,8 +60,28 @@ export class App {
 		this.mensaje = undefined;
 		this.tui = undefined;
 		this.terminal = undefined;
-		this.dialogos = crearDialogos(this.estilo, (construir) => this.mostrar(construir));
 		this.terminado = undefined;
+	}
+
+	/** Cambia entre la paleta oscura y la clara. */
+	usarEstilo(oscuro) {
+		this.estilo = crearEstilo({ oscuro });
+		this.dialogos = crearDialogos(this.estilo, (construir) => this.mostrar(construir), {
+			altoPantalla: () => this.terminal?.rows ?? 24,
+			altoLista: () => Math.max(5, Math.min(18, (this.terminal?.rows ?? 24) - 16)),
+		});
+	}
+
+	/** Pregunta a la consola su color de fondo para elegir paleta clara u oscura. */
+	async detectarFondo() {
+		const tema = this.preferencias.tema ?? "auto";
+		if (tema === "oscuro" || tema === "claro") return;
+		try {
+			const colores = await this.tui.queryTerminalColors({ timeoutMs: 150 });
+			if (colores?.background) this.usarEstilo(!esFondoClaro(colores.background));
+		} catch {
+			// Sin respuesta: se queda la paleta oscura.
+		}
 	}
 
 	// --- Consola ------------------------------------------------------------------
@@ -106,6 +126,7 @@ export class App {
 	/** @param {{ entrarDirecto?: boolean, argumentos?: string[] }} [opciones] */
 	async ejecutar({ entrarDirecto = false, argumentos = [] } = {}) {
 		this.encender();
+		await this.detectarFondo();
 		if (this.animacion && !entrarDirecto) await this.reproducirAnimacion();
 		this.refrescarDatos();
 		if (entrarDirecto && this.carpeta) await this.entrarAlChat({ argumentos });
@@ -119,7 +140,7 @@ export class App {
 
 	reproducirAnimacion() {
 		return new Promise((resolver) => {
-			const animacion = new AnimacionInicio({ alTerminar: resolver, alto: () => this.terminal.rows, version: versionHilosenda() });
+			const animacion = new AnimacionInicio({ alTerminar: resolver, alto: () => this.terminal.rows, version: versionHilosenda(), oscuro: this.estilo.oscuro });
 			this.poner(animacion);
 			animacion.empezar(this.tui);
 		});
@@ -144,77 +165,76 @@ export class App {
 		}
 	}
 
-	resumenModelo() {
+	/** Filas de la tarjeta "Tu proyecto". */
+	filasProyecto(ancho) {
+		const e = this.estilo;
+		const p = this.preferencias;
+		const etiqueta = (t) => ({ t: t.padEnd(15), fg: e.c.suave });
+		const icono = (t, n) => ({ t: `${t}  `, fg: e.c.acentos[n], negrita: true });
 		const porDefecto = modeloPorDefecto();
-		if (porDefecto) {
-			const nivel = NIVELES.find((n) => n.id === porDefecto.razonamiento)?.etiqueta ?? "Medio";
-			return `${this.estilo.texto(`${porDefecto.proveedor} / ${porDefecto.modelo}`)}  ${this.estilo.tenue(`razonamiento: ${nivel}`)}`;
+		const ia = porDefecto
+			? [
+					{ t: `${porDefecto.proveedor} / ${porDefecto.modelo}`, fg: e.c.texto, negrita: true },
+					{ t: `   razonamiento ${(NIVELES.find((n) => n.id === porDefecto.razonamiento)?.etiqueta ?? "Medio").toLowerCase()}`, fg: e.c.tenue },
+				]
+			: this.modelos.length > 0
+				? [{ t: `Automático · ${this.modelos.length} modelos disponibles`, fg: e.c.texto }]
+				: [{ t: "Ninguna IA conectada todavía — pulsa «Conectar una IA»", fg: e.c.aviso }];
+		const filas = [
+			[icono("▤", 0), etiqueta("Carpeta"), this.carpeta ? { t: acortarRuta(rutaBonita(this.carpeta), ancho - 20), fg: e.c.texto, negrita: true } : { t: "sin elegir — pulsa «Elegir carpeta»", fg: e.c.aviso }],
+			[icono("◆", 4), etiqueta("IA"), ...ia],
+			[icono("≡", 6), etiqueta("Instrucciones"), p.instrucciones ? { t: `${nombreCorto(p.instrucciones)}${p.instruccionesActivas ? "" : " (desactivadas)"}`, fg: e.c.texto } : { t: "ninguna (opcional)", fg: e.c.tenue }],
+			[icono("◈", 7), etiqueta("Permisos"), { t: PERMISOS.find((x) => x.id === p.permisos)?.etiqueta ?? "Preguntarme antes", fg: e.c.texto }],
+		];
+		for (const local of this.locales) {
+			filas.push([{ t: "✓  ", fg: e.c.exito, negrita: true }, { t: `Encontré ${local.proveedor.nombre} en tu computadora con ${local.deteccion.modelos.length} modelos — pulsa «Conectar una IA»`, fg: e.c.exito }]);
 		}
-		if (this.modelos.length > 0) return this.estilo.suave(`Automatico (${this.modelos.length} modelos disponibles)`);
-		return this.estilo.aviso("Ninguna IA conectada todavia. Pulsa «Conectar una IA».");
+		if (this.mensaje) {
+			const color = this.mensaje.tipo === "error" ? e.c.error : this.mensaje.tipo === "aviso" ? e.c.aviso : e.c.exito;
+			filas.push([{ t: "✓  ", fg: color, negrita: true }, { t: this.mensaje.texto, fg: color }]);
+		}
+		return filas;
 	}
 
 	pantallaInicio() {
 		return this.mostrar((cerrar) => {
 			const e = this.estilo;
+			const filas = () => this.terminal?.rows ?? 40;
 			const pantalla = new Pantalla(e, {
+				titulo: "hilosenda",
+				alto: filas,
 				alSalir: () => cerrar("salir"),
-				pie: "Haz clic en un boton · o usa Flechas/Tab y Enter · Esc para salir",
+				pie: `Clic o Enter para elegir · Tab y flechas para moverte · Esc o ✕ para salir          hilosenda ${versionHilosenda()} · Pi ${rutaCliPi().version}`,
 			});
 			pantalla.margen = 3;
-			pantalla.agregar(new Logo(e, "tu senda con la IA, hilo a hilo"));
-			pantalla.agregar(new Seccion(e, "Tu trabajo"));
-			pantalla.agregar(
-				new Parrafo((ancho) => {
-					const p = this.preferencias;
-					const carpeta = this.carpeta ? e.texto(acortarRuta(rutaBonita(this.carpeta), ancho - 15)) : e.aviso("Sin elegir. Pulsa «Elegir carpeta».");
-					const instrucciones = p.instrucciones
-						? `${e.texto(nombreCorto(p.instrucciones))}${p.instruccionesActivas ? "" : e.tenue(" (desactivadas)")}`
-						: e.tenue("ninguna (opcional)");
-					const permisos = PERMISOS.find((x) => x.id === p.permisos)?.etiqueta ?? "Preguntarme antes";
-					const lineas = [
-						`${e.suave("Carpeta:       ")}${carpeta}`,
-						`${e.suave("IA / modelo:   ")}${this.resumenModelo()}`,
-						`${e.suave("Instrucciones: ")}${instrucciones}`,
-						`${e.suave("Permisos:      ")}${e.texto(permisos)}`,
-					];
-					for (const local of this.locales) {
-						lineas.push(
-							"",
-							e.exito(`✓ Encontre ${local.proveedor.nombre} en tu computadora con ${local.deteccion.modelos.length} modelos. Pulsa «Conectar una IA» para usarlo.`),
-						);
-					}
-					if (this.mensaje) lineas.push("", this.mensaje);
-					return lineas.join("\n");
-				}),
-			);
+			if (filas() >= 38) pantalla.agregar(new Logo(e, "tu senda con la IA, hilo a hilo"));
+			pantalla.agregar(new Parrafo(""));
+			pantalla.agregar(new Tarjeta(e, (ancho) => this.filasProyecto(ancho), { titulo: "Tu proyecto" }));
 			pantalla.agregar(new Parrafo(""));
 			pantalla.agregar(
-				new FilaBotones(e, [{ id: "chat", etiqueta: "▶  Empezar a chatear", tipo: "primario", ayuda: "Abre el chat con la IA en la carpeta elegida" }], {
+				new FilaBotones(e, [{ id: "chat", etiqueta: "▶   Empezar a chatear", tipo: "primario", ayuda: "Abre el chat con la IA en la carpeta elegida" }], {
 					grande: true,
 					centrado: true,
-					mostrarAyuda: false,
 					alPulsar: cerrar,
 				}),
 			);
 			pantalla.agregar(new Parrafo(""));
 			pantalla.agregar(
-				new FilaBotones(
+				new Mosaico(
 					e,
 					[
-						{ id: "carpeta", etiqueta: "Elegir carpeta", ayuda: "Elige en que carpeta (proyecto) va a trabajar la IA" },
-						{ id: "recientes", etiqueta: "Carpetas recientes", ayuda: "Vuelve a una carpeta que usaste antes" },
-						{ id: "historial", etiqueta: "Conversaciones anteriores", ayuda: "Retoma un chat anterior justo donde lo dejaste" },
-						{ id: "conectar", etiqueta: "Conectar una IA", ayuda: "Agrega Ollama, Claude, GPT, Gemini o cualquier otra IA; sus modelos se detectan solos" },
-						{ id: "modelo", etiqueta: "Elegir modelo", ayuda: "Elige con que modelo de IA empezar" },
-						{ id: "razonamiento", etiqueta: "Razonamiento", ayuda: "Cuanto piensa la IA antes de responder" },
-						{ id: "instrucciones", etiqueta: "Instrucciones", ayuda: "Elige un archivo .md o .txt con reglas que la IA siempre seguira" },
-						{ id: "permisos", etiqueta: "Permisos", ayuda: "Decide si la IA te pide permiso antes de cambiar cosas" },
-						{ id: "ajustes", etiqueta: "Ajustes", ayuda: "Tema, barra de botones, conexiones y mas" },
-						{ id: "ayuda", etiqueta: "Ayuda", ayuda: "Explicacion paso a paso para empezar" },
-						{ id: "salir", etiqueta: "Salir", tipo: "suave", ayuda: "Cierra hilosenda" },
+						{ id: "carpeta", icono: "▤", titulo: "Elegir carpeta", descripcion: "Dónde trabaja la IA", color: 0 },
+						{ id: "recientes", icono: "↺", titulo: "Recientes", descripcion: "Vuelve a un proyecto", color: 1 },
+						{ id: "historial", icono: "❝", titulo: "Conversaciones", descripcion: "Retoma un chat", color: 2 },
+						{ id: "conectar", icono: "✦", titulo: "Conectar una IA", descripcion: "Ollama, GPT, Claude…", color: 3 },
+						{ id: "modelo", icono: "◆", titulo: "Elegir modelo", descripcion: "Con qué IA hablar", color: 4 },
+						{ id: "razonamiento", icono: "◑", titulo: "Razonamiento", descripcion: "Cuánto piensa antes", color: 5 },
+						{ id: "instrucciones", icono: "≡", titulo: "Instrucciones", descripcion: "Reglas .md o .txt", color: 6 },
+						{ id: "permisos", icono: "◈", titulo: "Permisos", descripcion: "Qué puede hacer sola", color: 7 },
+						{ id: "ajustes", icono: "⚙", titulo: "Ajustes", descripcion: "Tema y conexiones", color: 8 },
+						{ id: "ayuda", icono: "?", titulo: "Ayuda", descripcion: "Cómo empezar", color: 9 },
 					],
-					{ mostrarAyuda: true, alPulsar: cerrar },
+					{ alPulsar: cerrar, anchoMinimo: 27, columnasMax: 5 },
 				),
 			);
 			// El foco empieza en el boton grande.
@@ -267,7 +287,7 @@ export class App {
 	usarCarpeta(ruta) {
 		this.carpeta = ruta;
 		this.preferencias = agregarReciente(ruta);
-		this.mensaje = this.estilo.exito(`✓ Carpeta elegida: ${rutaBonita(ruta)}`);
+		this.mensaje = { texto: `Carpeta elegida: ${rutaBonita(ruta)}`, tipo: "exito" };
 	}
 
 	// --- Chat ---------------------------------------------------------------------------
@@ -308,7 +328,7 @@ export class App {
 			}
 			agregarReciente(carpeta);
 			this.apagar();
-			const { traspaso } = await abrirPi({ carpeta, argumentos, alIniciar });
+			const { traspaso } = await abrirPi({ carpeta, argumentos, alIniciar, tema: this.preferencias.tema });
 			this.encender();
 			this.preferencias = leerPreferencias();
 			if (traspaso?.accion === "carpeta") {
@@ -390,7 +410,7 @@ export class App {
 		}
 		guardarAjustesPi({ defaultProvider: resultado.proveedor, defaultModel: resultado.modelo });
 		this.locales = this.locales.filter((l) => l.proveedor.id !== resultado.proveedor);
-		this.mensaje = this.estilo.exito(`✓ Listo: usaras ${resultado.proveedor} / ${resultado.modelo}`);
+		this.mensaje = { texto: `Listo: usaras ${resultado.proveedor} / ${resultado.modelo}`, tipo: "exito" };
 		this.refrescarDatos();
 		return true;
 	}
@@ -429,7 +449,7 @@ export class App {
 		}
 		if (!eleccion || eleccion.boton) return;
 		guardarAjustesPi({ defaultProvider: eleccion.proveedor, defaultModel: eleccion.id });
-		this.mensaje = this.estilo.exito(`✓ Modelo elegido: ${eleccion.proveedor} / ${eleccion.id}`);
+		this.mensaje = { texto: `Modelo elegido: ${eleccion.proveedor} / ${eleccion.id}`, tipo: "exito" };
 	}
 
 	async elegirRazonamiento() {
@@ -451,7 +471,7 @@ export class App {
 	async gestionarInstrucciones() {
 		const resultado = await gestionarInstrucciones(this.dialogos, { carpeta: this.carpeta });
 		this.preferencias = leerPreferencias();
-		if (resultado) this.mensaje = this.estilo.exito(`✓ ${resultado}`);
+		if (resultado) this.mensaje = { texto: `${resultado}`, tipo: "exito" };
 	}
 
 	// --- Ajustes ------------------------------------------------------------------------
@@ -461,7 +481,7 @@ export class App {
 			const p = (this.preferencias = leerPreferencias());
 			const piAjustes = leerAjustesPi();
 			const siNo = (v) => (v ? "Si" : "No");
-			const tema = { system: "Automatico (como la consola)", dark: "Oscuro", light: "Claro" }[piAjustes.theme ?? "system"] ?? piAjustes.theme;
+			const tema = { auto: "hilosenda automático", oscuro: "hilosenda oscuro", claro: "hilosenda claro", pi: "el de Pi" }[p.tema ?? "auto"] ?? "hilosenda";
 			const eleccion = await this.dialogos.elegir({
 				titulo: "Ajustes",
 				explicacion: "Haz clic en un ajuste para cambiarlo.",
@@ -481,14 +501,21 @@ export class App {
 			if (eleccion === undefined || typeof eleccion === "object") return;
 			if (eleccion === "tema") {
 				const t = await this.dialogos.elegir({
-					titulo: "Tema de colores (dentro del chat)",
+					titulo: "Tema de colores",
+					explicacion: "Se usa en esta pantalla y en el chat.",
 					elementos: [
-						{ id: "system", etiqueta: "Automatico", detalle: "Igual que tu consola", valor: "system" },
-						{ id: "dark", etiqueta: "Oscuro", valor: "dark" },
-						{ id: "light", etiqueta: "Claro", valor: "light" },
+						{ id: "auto", etiqueta: "hilosenda automático", detalle: "Claro u oscuro según tu consola", valor: "auto" },
+						{ id: "oscuro", etiqueta: "hilosenda oscuro", valor: "oscuro" },
+						{ id: "claro", etiqueta: "hilosenda claro", valor: "claro" },
+						{ id: "pi", etiqueta: "El tema de Pi", detalle: "El que elijas en los ajustes avanzados de Pi", valor: "pi" },
 					],
+					inicial: p.tema ?? "auto",
 				});
-				if (typeof t === "string") guardarAjustesPi({ theme: t });
+				if (typeof t === "string") {
+					this.preferencias = guardarPreferencias({ tema: t });
+					if (t === "oscuro" || t === "claro") this.usarEstilo(t === "oscuro");
+					else await this.detectarFondo();
+				}
 			} else if (eleccion === "barra") guardarPreferencias({ barraBotones: !p.barraBotones });
 			else if (eleccion === "principiante") guardarPreferencias({ modoPrincipiante: !p.modoPrincipiante });
 			else if (eleccion === "animacion") guardarPreferencias({ animacion: p.animacion === false });

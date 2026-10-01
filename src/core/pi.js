@@ -12,6 +12,15 @@ export const RAIZ_HILOSENDA = join(dirname(fileURLToPath(import.meta.url)), ".."
 /** Archivo de la extension que agrega la interfaz de hilosenda dentro de Pi. */
 export const EXTENSION_HILOSENDA = join(RAIZ_HILOSENDA, "extension", "hilosenda.ts");
 
+/** Temas de colores de hilosenda para el chat. */
+export const CARPETA_TEMAS = join(RAIZ_HILOSENDA, "temas");
+
+/** Opciones de Pi para usar el tema elegido en las preferencias. */
+export function argumentosTema(tema = "auto") {
+	const usar = { auto: "hilosenda-claro/hilosenda-oscuro", oscuro: "hilosenda-oscuro", claro: "hilosenda-claro" }[tema];
+	return ["--theme", CARPETA_TEMAS, ...(usar ? ["--use-theme", usar] : [])];
+}
+
 /** Ruta del programa de Pi instalado junto a hilosenda. */
 export function rutaCliPi() {
 	let carpeta = dirname(fileURLToPath(import.meta.resolve("@earendil-works/pi-coding-agent")));
@@ -81,10 +90,10 @@ export async function listarConversaciones() {
 
 /**
  * Arranca Pi con la extension de hilosenda y espera a que termine.
- * @param {{ carpeta: string, argumentos?: string[], alIniciar?: string }} opciones
+ * @param {{ carpeta: string, argumentos?: string[], alIniciar?: string, tema?: string }} opciones
  * @returns {Promise<{ codigo: number, traspaso: Traspaso | undefined }>}
  */
-export function abrirPi({ carpeta, argumentos = [], alIniciar }) {
+export function abrirPi({ carpeta, argumentos = [], alIniciar, tema }) {
 	const { cli } = rutaCliPi();
 	const traspaso = join(tmpdir(), `hilosenda-${process.pid}-${Date.now()}.json`);
 	const entorno = { ...process.env, HILOSENDA: "1", HILOSENDA_TRASPASO: traspaso };
@@ -95,7 +104,7 @@ export function abrirPi({ carpeta, argumentos = [], alIniciar }) {
 		// Pi maneja Ctrl+C por su cuenta; hilosenda no debe cerrarse por eso.
 		const ignorar = () => {};
 		process.on("SIGINT", ignorar);
-		const hijo = spawn(process.execPath, [cli, "-e", EXTENSION_HILOSENDA, ...argumentos], {
+		const hijo = spawn(process.execPath, [cli, "-e", EXTENSION_HILOSENDA, ...argumentosTema(tema), ...argumentos], {
 			cwd: carpeta,
 			env: entorno,
 			stdio: "inherit",
