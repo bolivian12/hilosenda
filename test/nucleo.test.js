@@ -198,3 +198,37 @@ describe("interfaz", () => {
 		assert.deepEqual(elegidos, ["b"]);
 	});
 });
+
+describe("dbus", async () => {
+	const { codificarMensaje, decodificarMensaje, dividirFirma, variante } = await import("../src/core/dbus.js");
+
+	test("divide firmas en tipos completos", () => {
+		assert.deepEqual(dividirFirma("ssa{sv}"), ["s", "s", "a{sv}"]);
+		assert.deepEqual(dividirFirma("ua{sv}a(sa(us))"), ["u", "a{sv}", "a(sa(us))"]);
+	});
+
+	test("un mensaje se codifica y se vuelve a leer igual", () => {
+		const opciones = [
+			["handle_token", variante("s", "tok")],
+			["directory", variante("b", true)],
+			["current_folder", variante("ay", Buffer.from("/tmp\0"))],
+			["filters", variante("a(sa(us))", [["Texto", [[0, "*.md"], [0, "*.txt"]]]])],
+		];
+		const datos = codificarMensaje({ tipo: 1, serie: 7, ruta: "/a/b", interfaz: "x.Y", miembro: "Abrir", destino: "x.Dest", firma: "ssa{sv}", cuerpo: ["", "Titulo ñ", opciones] });
+		const { mensaje, usados } = decodificarMensaje(Buffer.concat([datos, Buffer.from([1, 2, 3])]));
+		assert.equal(usados, datos.length);
+		assert.equal(mensaje.serie, 7);
+		assert.equal(mensaje.ruta, "/a/b");
+		assert.equal(mensaje.miembro, "Abrir");
+		const [, titulo, leidas] = mensaje.cuerpo;
+		assert.equal(titulo, "Titulo ñ");
+		assert.equal(leidas.directory.valor, true);
+		assert.equal(leidas.current_folder.valor.toString(), "/tmp\0");
+		assert.deepEqual(leidas.filters.valor, [["Texto", [[0, "*.md"], [0, "*.txt"]]]]);
+	});
+
+	test("un mensaje incompleto espera mas datos", () => {
+		const datos = codificarMensaje({ tipo: 4, serie: 1, ruta: "/r", interfaz: "i.I", miembro: "S", firma: "u", cuerpo: [3] });
+		assert.equal(decodificarMensaje(datos.subarray(0, datos.length - 1)), undefined);
+	});
+});

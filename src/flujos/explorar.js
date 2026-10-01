@@ -34,8 +34,9 @@ function leerCarpeta(ruta) {
  * @param {import("../ui/dialogos.js").Dialogos} ui
  * @param {"carpeta" | "instrucciones"} tipo
  * @param {string} [inicio]
+ * @param {string} [aviso] Por que no se abrio la ventana del sistema.
  */
-export async function explorar(ui, tipo, inicio) {
+export async function explorar(ui, tipo, inicio, aviso) {
 	let actual = inicio && existsSync(inicio) ? resolve(inicio) : homedir();
 	while (true) {
 		const entradas = leerCarpeta(actual);
@@ -82,7 +83,7 @@ export async function explorar(ui, tipo, inicio) {
 		if (tipo === "carpeta") extras.unshift({ id: "nueva", etiqueta: "+ Nueva carpeta aqui" });
 		const eleccion = await ui.elegir({
 			titulo: tipo === "carpeta" ? "Elige la carpeta de tu proyecto" : "Elige el archivo de instrucciones (.md o .txt)",
-			explicacion: `Estas en: ${actual}\n${tipo === "carpeta" ? "Haz clic en una carpeta para entrar y luego en «Usar esta carpeta»." : "Haz clic en una carpeta para entrar y luego en el archivo."}`,
+			explicacion: `${aviso ? `No se pudo abrir la ventana del sistema (${aviso}). Puedes elegir aqui mismo.\n` : ""}Estas en: ${actual}\n${tipo === "carpeta" ? "Haz clic en una carpeta para entrar y luego en «Usar esta carpeta»." : "Haz clic en una carpeta para entrar y luego en el archivo."}`,
 			elementos,
 			buscador: true,
 			extras,
@@ -124,12 +125,14 @@ export async function explorar(ui, tipo, inicio) {
  * @param {{ inicio?: string, ventana?: boolean }} [opciones]
  */
 export async function elegirCarpeta(ui, opciones = {}) {
+	let aviso;
 	if (opciones.ventana !== false && selectorGraficoDisponible()) {
-		const r = await ui.esperar("Se abrio una ventana para elegir la carpeta. Si no la ves, mira detras de esta ventana…", elegirConVentana("carpeta", { inicio: opciones.inicio }));
+		const r = await ui.esperar("Abriendo la ventana para elegir la carpeta… (si no la ves, mira detras de esta ventana)", elegirConVentana("carpeta", { inicio: opciones.inicio }));
 		if (r.estado === "ok") return r.ruta;
 		if (r.estado === "cancelado") return undefined;
+		aviso = r.motivo;
 	}
-	return explorar(ui, "carpeta", opciones.inicio);
+	return explorar(ui, "carpeta", opciones.inicio, aviso);
 }
 
 /**
@@ -138,12 +141,14 @@ export async function elegirCarpeta(ui, opciones = {}) {
  * @param {{ inicio?: string, ventana?: boolean }} [opciones]
  */
 export async function elegirInstrucciones(ui, opciones = {}) {
+	let aviso;
 	if (opciones.ventana !== false && selectorGraficoDisponible()) {
-		const r = await ui.esperar("Se abrio una ventana para elegir el archivo. Si no la ves, mira detras de esta ventana…", elegirConVentana("instrucciones", { inicio: opciones.inicio }));
+		const r = await ui.esperar("Abriendo la ventana para elegir el archivo… (si no la ves, mira detras de esta ventana)", elegirConVentana("instrucciones", { inicio: opciones.inicio }));
 		if (r.estado === "ok") return r.ruta;
 		if (r.estado === "cancelado") return undefined;
+		aviso = r.motivo;
 	}
-	return explorar(ui, "instrucciones", opciones.inicio);
+	return explorar(ui, "instrucciones", opciones.inicio, aviso);
 }
 
 export const nombreCorto = (ruta) => basename(ruta) || ruta;

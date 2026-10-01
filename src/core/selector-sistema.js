@@ -1,12 +1,16 @@
 // Ventanas del sistema para elegir carpetas y archivos.
 //
-// Windows usa PowerShell, macOS usa AppleScript y Linux usa zenity, kdialog o yad
-// (el que este instalado). Si no hay entorno grafico (por ejemplo por SSH),
-// devuelve "no-disponible" y hilosenda ofrece su explorador dentro de la consola.
+// Windows usa PowerShell y macOS usa AppleScript. En Linux se intenta, en orden:
+//   1. el portal de escritorio (selector nativo de GNOME, KDE, Hyprland...),
+//   2. zenity, kdialog o yad si estan instalados,
+//   3. en NixOS, zenity obtenido con Nix.
+// Si no hay entorno grafico (por ejemplo por SSH), devuelve "no-disponible" con el
+// motivo y hilosenda ofrece su explorador dentro de la consola.
 
 import { execFile } from "node:child_process";
 import { existsSync } from "node:fs";
 import { delimiter, join } from "node:path";
+import { elegirConPortal } from "./portal.js";
 
 /**
  * @typedef {{ estado: "ok", ruta: string } | { estado: "cancelado" } | { estado: "no-disponible", motivo: string }} Resultado
@@ -30,7 +34,7 @@ const hayEscritorioLinux = () => Boolean(process.env.DISPLAY || process.env.WAYL
 /** Indica si se puede abrir una ventana del sistema en este equipo. */
 export function selectorGraficoDisponible() {
 	if (process.platform === "win32" || process.platform === "darwin") return !process.env.SSH_CONNECTION;
-	return hayEscritorioLinux() && ["zenity", "kdialog", "yad"].some(existeEnPath);
+	return hayEscritorioLinux();
 }
 
 // --- Windows -------------------------------------------------------------------
@@ -105,17 +109,26 @@ async function elegirMac(tipo, titulo, inicio) {
 
 // --- Linux ---------------------------------------------------------------------
 
+function argumentosZenity(tipo, titulo, desde) {
+	const args = ["--file-selection", `--title=${titulo}`];
+	if (tipo === "carpeta") args.push("--directory");
+	else args.push("--file-filter=Instrucciones | *.md *.MD *.markdown *.txt *.TXT", "--file-filter=Todos | *");
+	if (desde) args.push(`--filename=${desde}`);
+	return args;
+}
+
 async function elegirLinux(tipo, titulo, inicio) {
-	if (!hayEscritorioLinux()) return { estado: "no-disponible", motivo: "No hay escritorio grafico" };
+	if (!hayEscritorioLinux()) return { estado: "no-disponible", motivo: "no hay escritorio grafico (¿conexion por SSH?)" };
+	const motivos = [];
+
+	const portal = await elegirConPortal(tipo, { titulo, inicio });
+	if (portal.estado !== "no-disponible") return portal;
+	motivos.push(portal.motivo);
+
 	const desde = inicio ? `${inicio.replace(/\/$/, "")}/` : undefined;
 	const opciones = [];
-	if (existeEnPath("zenity") || existeEnPath("yad")) {
-		const programa = existeEnPath("zenity") ? "zenity" : "yad";
-		const args = ["--file-selection", `--title=${titulo}`];
-		if (tipo === "carpeta") args.push("--directory");
-		else args.push("--file-filter=Instrucciones | *.md *.markdown *.txt", "--file-filter=Todos | *");
-		if (desde) args.push(`--filename=${desde}`);
-		opciones.push([programa, args]);
+	for (const programa of ["zenity", "yad"]) {
+		if (existeEnPath(programa)) opciones.push([programa, argumentosZenity(tipo, titulo, desde)]);
 	}
 	if (existeEnPath("kdialog")) {
 		opciones.push([
@@ -130,7 +143,16 @@ async function elegirLinux(tipo, titulo, inicio) {
 		if (r.codigo === 0 && r.salida.trim()) return { estado: "ok", ruta: r.salida.trim() };
 		if (r.codigo === 1) return { estado: "cancelado" };
 	}
-	return { estado: "no-disponible", motivo: "Instala zenity o kdialog para usar la ventana de seleccion" };
+	if (opciones.length === 0) motivos.push("zenity/kdialog no estan instalados");
+
+	// En NixOS se puede pedir zenity a Nix sin instalarlo (la primera vez tarda).
+	if (existeEnPath("nix")) {
+		const r = await ejecutar("nix", ["--extra-experimental-features", "nix-command flakes", "run", "nixpkgs#zenity", "--", ...argumentosZenity(tipo, titulo, desde)]);
+		if (r.codigo === 0 && r.salida.trim()) return { estado: "ok", ruta: r.salida.trim() };
+		if (r.codigo === 1 && !/error:/i.test(r.errores)) return { estado: "cancelado" };
+		motivos.push("nix no pudo obtener zenity");
+	}
+	return { estado: "no-disponible", motivo: motivos.join("; ") };
 }
 
 /**
