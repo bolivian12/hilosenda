@@ -16,7 +16,7 @@ import { CustomEditor, SessionManager } from "@earendil-works/pi-coding-agent";
 import { matchesKey, visibleWidth } from "@earendil-works/pi-tui";
 import { imagenEnTexto } from "../src/ui/vista-imagen.js";
 import { leerPortapapeles, rutasDesdeTexto } from "../src/core/portapapeles.js";
-import { guardarAjustesPi } from "../src/core/pi-config.js";
+import { guardarAjustesPi, leerAjustesPi, leerClaves, leerModelosJson, quitarClave, quitarProveedor } from "../src/core/pi-config.js";
 import { guardarPreferencias as guardarPreferenciasDisco, leerPreferencias as leerPreferenciasDisco } from "../src/core/preferencias.js";
 import { aIdentificador, conectarIA } from "../src/flujos/conectar.js";
 import { elegirCarpeta, elegirImagen, nombreCorto } from "../src/flujos/explorar.js";
@@ -346,42 +346,127 @@ export default function hilosenda(pi: ExtensionAPI) {
 
 	// --- Acciones ----------------------------------------------------------------
 
+	/** Quita un proveedor: su clave guardada y/o su configuracion en models.json. */
+	async function quitarProveedorChat(ctx: ExtensionContext, ui: Dialogos, proveedor: string): Promise<boolean> {
+		const nombre = ctx.modelRegistry.getProviderDisplayName(proveedor) ?? proveedor;
+		const enModelos = Boolean(leerModelosJson().providers[proveedor]);
+		const clave = leerClaves()[proveedor] as { type?: string } | undefined;
+		if (!enModelos && !clave) {
+			await ui.informar({
+				titulo: `No se puede quitar ${nombre} desde aquí`,
+				texto: `${nombre} está conectado con una variable de entorno o con credenciales del sistema (por ejemplo ${proveedor.toUpperCase().replace(/-/g, "_")}_API_KEY). Quítala de tu configuración del sistema y vuelve a abrir el chat.`,
+			});
+			return false;
+		}
+		const si = await ui.confirmar({
+			titulo: `¿Quitar ${nombre}?`,
+			explicacion: `Se borrará ${clave?.type === "oauth" ? "la sesión iniciada" : clave ? "la clave API guardada" : "la configuración"} de ${nombre} en esta computadora. Podrás volver a conectarlo cuando quieras.`,
+			si: "Sí, quitar",
+			no: "Cancelar",
+			peligro: true,
+		});
+		if (!si) return false;
+		if (clave) quitarClave(proveedor);
+		if (enModelos) quitarProveedor(proveedor);
+		if (leerAjustesPi().defaultProvider === proveedor) guardarAjustesPi({ defaultProvider: undefined, defaultModel: undefined });
+		await ctx.modelRegistry.refresh().catch(() => undefined);
+		ctx.ui.notify(`${nombre} quitado.${ctx.model?.provider === proveedor ? " Elige otro modelo para seguir chateando." : ""}`, "info");
+		return true;
+	}
+
 	async function elegirModelo(ctx: ExtensionContext, busqueda?: string) {
 		await conDialogo(ctx, async (ui) => {
 			const actual = ctx.model;
-			const disponibles = ctx.modelRegistry.getAvailable();
-			const filtro = busqueda?.toLowerCase();
-			const elementos = disponibles
-				.filter((m) => !filtro || `${m.provider}/${m.id} ${m.name ?? ""}`.toLowerCase().includes(filtro))
-				.map((m) => ({
-					id: `${m.provider}/${m.id}`,
-					etiqueta: `${actual && actual.provider === m.provider && actual.id === m.id ? "● " : "  "}${m.name ?? m.id}`,
-					detalle: [m.name && m.name !== m.id ? m.id : "", contextoCorto(m.contextWindow) && `${contextoCorto(m.contextWindow)} de contexto`, m.reasoning && "razona", m.input?.includes("image") && "ve imagenes"]
-						.filter(Boolean)
-						.join(" · "),
-					grupo: ctx.modelRegistry.getProviderDisplayName(m.provider) ?? m.provider,
-					buscarEn: m.provider,
-					valor: m,
-				}));
-			const eleccion = await ui.elegir({
-				titulo: "Elegir modelo",
-				explicacion: "Haz clic en un modelo para usarlo (queda guardado para la proxima vez). Escribe para buscar.",
-				elementos,
-				buscador: true,
-				vacio: "No hay modelos con credenciales. Pulsa «Conectar otra IA».",
-				inicial: actual ? `${actual.provider}/${actual.id}` : undefined,
-				extras: [{ id: "conectar", etiqueta: "+ Conectar otra IA", tipo: "primario" }],
-			});
-			if (eleccion?.boton === "conectar") {
-				await flujoConectar(ctx, ui);
-				return;
-			}
-			if (!eleccion || eleccion.boton) return;
-			if (await pi.setModel(eleccion)) {
-				guardarAjustesPi({ defaultProvider: eleccion.provider, defaultModel: eleccion.id });
-				ctx.ui.notify(`Modelo: ${nombreModelo(eleccion)}`, "info");
-			} else {
-				ctx.ui.notify("Ese modelo no tiene credenciales. Conectalo primero.", "warning");
+			const describir = (m: ModeloPi) =>
+				[m.name && m.name !== m.id ? m.id : "", contextoCorto(m.contextWindow) && `${contextoCorto(m.contextWindow)} de contexto`, m.reasoning && "razona", m.input?.includes("image") && "ve imágenes"]
+					.filter(Boolean)
+					.join(" · ");
+			const nombreProveedor = (id: string) => ctx.modelRegistry.getProviderDisplayName(id) ?? id;
+			const usar = async (m: ModeloPi) => {
+				if (await pi.setModel(m)) {
+					guardarAjustesPi({ defaultProvider: m.provider, defaultModel: m.id });
+					ctx.ui.notify(`Modelo: ${nombreModelo(m)}`, "info");
+				} else {
+					ctx.ui.notify("Ese modelo no tiene credenciales. Conéctalo primero.", "warning");
+				}
+			};
+			let proveedor: string | undefined = busqueda ? "__todos" : undefined;
+			while (true) {
+				const disponibles = ctx.modelRegistry.getAvailable();
+				if (!proveedor) {
+					// Paso 1: elegir proveedor.
+					const porProveedor = new Map<string, number>();
+					for (const m of disponibles) porProveedor.set(m.provider, (porProveedor.get(m.provider) ?? 0) + 1);
+					const eleccion = await ui.elegir({
+						titulo: "Elegir modelo · proveedor",
+						explicacion: "Primero elige el proveedor (la empresa o programa de la IA). Escribe para buscar.",
+						elementos: [
+							{ id: "__todos", etiqueta: "Todos los modelos", detalle: `${disponibles.length} modelos · buscar en todos`, valor: "__todos" },
+							...[...porProveedor.entries()]
+								.sort((a, b) => nombreProveedor(a[0]).localeCompare(nombreProveedor(b[0])))
+								.map(([id, n]) => ({
+									id,
+									etiqueta: `${actual?.provider === id ? "● " : "  "}${nombreProveedor(id)}`,
+									detalle: `${n} modelo${n === 1 ? "" : "s"}${actual?.provider === id ? ` · en uso: ${nombreModelo(actual)}` : ""}`,
+									buscarEn: id,
+									valor: id,
+								})),
+						],
+						buscador: true,
+						inicial: actual?.provider,
+						vacio: "No hay ninguna IA conectada. Pulsa «Conectar otra IA».",
+						extras: [
+							{ id: "conectar", etiqueta: "+ Conectar otra IA", tipo: "primario" },
+							{ id: "quitar", etiqueta: "Quitar un proveedor", tipo: "peligro" },
+						],
+					});
+					if (eleccion?.boton === "conectar") return flujoConectar(ctx, ui);
+					if (eleccion?.boton === "quitar") {
+						const cual = await ui.elegir({
+							titulo: "¿Qué proveedor quieres quitar?",
+							elementos: [...porProveedor.keys()].map((id) => ({ id, etiqueta: nombreProveedor(id), detalle: id, valor: id })),
+							buscador: true,
+						});
+						if (typeof cual === "string") await quitarProveedorChat(ctx, ui, cual);
+						continue;
+					}
+					if (typeof eleccion !== "string") return;
+					proveedor = eleccion;
+					continue;
+				}
+				// Paso 2: modelos del proveedor elegido (o de todos).
+				const filtro = busqueda?.toLowerCase();
+				busqueda = undefined;
+				const lista = disponibles
+					.filter((m) => proveedor === "__todos" || m.provider === proveedor)
+					.filter((m) => !filtro || `${m.provider}/${m.id} ${m.name ?? ""}`.toLowerCase().includes(filtro));
+				const extras = [{ id: "proveedores", etiqueta: "← Proveedores", tipo: "suave" as const }];
+				if (proveedor !== "__todos") extras.push({ id: "quitar", etiqueta: "Quitar este proveedor", tipo: "peligro" as never });
+				const eleccion = await ui.elegir({
+					titulo: proveedor === "__todos" ? "Elegir modelo · todos" : `Elegir modelo · ${nombreProveedor(proveedor)}`,
+					explicacion: "Haz clic en un modelo para usarlo (queda guardado para la próxima vez). Escribe para buscar.",
+					elementos: lista.map((m) => ({
+						id: `${m.provider}/${m.id}`,
+						etiqueta: `${actual && actual.provider === m.provider && actual.id === m.id ? "● " : "  "}${m.name ?? m.id}`,
+						detalle: describir(m),
+						grupo: proveedor === "__todos" ? nombreProveedor(m.provider) : undefined,
+						buscarEn: m.provider,
+						valor: m,
+					})),
+					buscador: true,
+					inicial: actual ? `${actual.provider}/${actual.id}` : undefined,
+					extras,
+				});
+				if (eleccion?.boton === "proveedores") {
+					proveedor = undefined;
+					continue;
+				}
+				if (eleccion?.boton === "quitar") {
+					if (await quitarProveedorChat(ctx, ui, proveedor)) proveedor = undefined;
+					continue;
+				}
+				if (!eleccion || eleccion.boton) return;
+				return usar(eleccion);
 			}
 		});
 	}
