@@ -25,7 +25,8 @@ export function rutasDesdeTexto(texto) {
 		.split(/\r?\n/)
 		.map((l) => l.trim())
 		.filter((l) => l && !l.startsWith("#"));
-	if (lineas.length === 0) return [];
+	// Un texto largo pegado nunca es una lista de archivos: no revisar el disco por cada linea.
+	if (lineas.length === 0 || lineas.length > 50 || lineas.some((l) => l.length > 1024)) return [];
 	const rutas = [];
 	for (let linea of lineas) {
 		// Arrastrar y soltar suele entregar rutas entre comillas o con espacios escapados.
@@ -48,16 +49,25 @@ export function rutasDesdeTexto(texto) {
  */
 export async function leerPortapapeles() {
 	if (process.platform === "win32") {
-		const ps = (comando, binario) => ejecutar("powershell.exe", ["-NoProfile", "-STA", "-Command", comando], binario);
-		const archivos = await ps("Add-Type -AssemblyName System.Windows.Forms; [System.Windows.Forms.Clipboard]::GetFileDropList() | ForEach-Object { $_ }");
-		const rutas = rutasDesdeTexto(archivos);
-		if (rutas.length) return { tipo: "archivos", rutas };
-		const imagen = await ps(
-			"Add-Type -AssemblyName System.Windows.Forms; $i=[System.Windows.Forms.Clipboard]::GetImage(); if ($i) { $m=New-Object IO.MemoryStream; $i.Save($m,[Drawing.Imaging.ImageFormat]::Png); [Convert]::ToBase64String($m.ToArray()) }",
-		);
-		if (imagen?.trim()) return { tipo: "imagen", datos: Buffer.from(imagen.trim(), "base64"), mime: "image/png" };
-		const texto = await ps("[Console]::OutputEncoding=[Text.Encoding]::UTF8; Get-Clipboard -Raw");
-		return texto ? { tipo: "texto", texto: texto.replace(/\r?\n$/, "") } : undefined;
+		// Un solo PowerShell (cada uno tarda en arrancar) que devuelve archivos, imagen o texto.
+		const script = [
+			"[Console]::OutputEncoding=[Text.Encoding]::UTF8",
+			"Add-Type -AssemblyName System.Windows.Forms",
+			"$c=[System.Windows.Forms.Clipboard]",
+			"$f=$c::GetFileDropList(); if ($f.Count -gt 0) { 'ARCHIVOS'; $f | ForEach-Object { $_ }; exit }",
+			"$i=$c::GetImage(); if ($i) { $m=New-Object IO.MemoryStream; $i.Save($m,[Drawing.Imaging.ImageFormat]::Png); 'IMAGEN'; [Convert]::ToBase64String($m.ToArray()); exit }",
+			"'TEXTO'; $c::GetText()",
+		].join("; ");
+		const salida = await ejecutar("powershell.exe", ["-NoProfile", "-STA", "-Command", script]);
+		if (!salida) return undefined;
+		const [tipo, ...resto] = salida.split(/\r?\n/);
+		if (tipo === "ARCHIVOS") {
+			const rutas = rutasDesdeTexto(resto.join("\n"));
+			return rutas.length ? { tipo: "archivos", rutas } : undefined;
+		}
+		if (tipo === "IMAGEN") return { tipo: "imagen", datos: Buffer.from(resto.join("").trim(), "base64"), mime: "image/png" };
+		const texto = resto.join("\n").replace(/\r?\n$/, "");
+		return texto ? { tipo: "texto", texto } : undefined;
 	}
 	if (process.platform === "darwin") {
 		const archivos = await ejecutar("osascript", ["-e", 'try\nset l to the clipboard as «class furl»\nPOSIX path of l\nend try']);

@@ -13,7 +13,8 @@ import { homedir } from "node:os";
 import { basename, extname } from "node:path";
 import type { ExtensionAPI, ExtensionCommandContext, ExtensionContext } from "@earendil-works/pi-coding-agent";
 import { CustomEditor, SessionManager } from "@earendil-works/pi-coding-agent";
-import { Image, matchesKey, visibleWidth } from "@earendil-works/pi-tui";
+import { matchesKey, visibleWidth } from "@earendil-works/pi-tui";
+import { imagenEnTexto } from "../src/ui/vista-imagen.js";
 import { leerPortapapeles, rutasDesdeTexto } from "../src/core/portapapeles.js";
 import { guardarAjustesPi } from "../src/core/pi-config.js";
 import { guardarPreferencias as guardarPreferenciasDisco, leerPreferencias as leerPreferenciasDisco } from "../src/core/preferencias.js";
@@ -700,7 +701,20 @@ export default function hilosenda(pi: ExtensionAPI) {
 		instalarAdjuntos(ctx);
 	}
 
+	let pegandoAhora = false;
 	async function pegarPortapapeles(ctx: ExtensionContext) {
+		if (pegandoAhora) return;
+		pegandoAhora = true;
+		ctx.ui.setWorkingMessage("Pegando…");
+		try {
+			await pegarPortapapelesAhora(ctx);
+		} finally {
+			pegandoAhora = false;
+			ctx.ui.setWorkingMessage("Trabajando… (Esc para detener)");
+		}
+	}
+
+	async function pegarPortapapelesAhora(ctx: ExtensionContext) {
 		const contenido = await leerPortapapeles().catch(() => undefined);
 		if (!contenido) {
 			ctx.ui.notify("El portapapeles está vacío o no se pudo leer (en Linux instala wl-clipboard o xclip).", "warning");
@@ -723,9 +737,34 @@ export default function hilosenda(pi: ExtensionAPI) {
 		}
 		ctx.ui.setWidget(
 			"hilosenda-adjuntos",
-			(tui, tema) => {
+			(tui) => {
 				pedirRenderAdjuntos = () => tui.requestRender();
-				const imagenes = new Map<Adjunto, Image>();
+				// Las vistas previas se calculan una vez por adjunto y ancho (no en cada cuadro).
+				const cache = new Map<Adjunto, { ancho: number; lineas: string[] }>();
+				const vistaDe = (a: Adjunto, ancho: number): string[] => {
+					const guardada = cache.get(a);
+					if (guardada && guardada.ancho === ancho) return guardada.lineas;
+					let lineas: string[] = [];
+					if (a.imagen) {
+						lineas = imagenEnTexto(a.imagen.data, Math.min(ancho - 6, 48), 12) ?? [];
+					} else if (a.ruta && a.bytes > 0 && a.bytes <= 2 * 1024 * 1024) {
+						try {
+							const inicio = readFileSync(a.ruta).subarray(0, 4096);
+							if (!inicio.includes(0)) {
+								const e = estiloActual();
+								lineas = inicio
+									.toString("utf8")
+									.split(/\r?\n/)
+									.filter((l) => l.trim()).slice(0, 4)
+									.map((l) => e.pintar(`│ ${recortar(l.replace(/\t/g, "  "), ancho - 10)}`, { fg: e.c.tenue }));
+							}
+						} catch {
+							lineas = [];
+						}
+					}
+					cache.set(a, { ancho, lineas });
+					return lineas;
+				};
 				let zonas: Array<{ y: number; x0: number; x1: number; indice: number }> = [];
 				let hover = -1;
 				return {
@@ -734,14 +773,7 @@ export default function hilosenda(pi: ExtensionAPI) {
 						const lineas = ["", e.pintar(`  Se enviará con tu mensaje (${adjuntos.length}):`, { fg: e.c.suave })];
 						zonas = [];
 						adjuntos.forEach((a, i) => {
-							if (a.imagen) {
-								let img = imagenes.get(a);
-								if (!img) {
-									img = new Image(a.imagen.data, a.imagen.mimeType, { fallbackColor: (t: string) => tema.fg("muted", t) }, { maxWidthCells: 40, maxHeightCells: 10, filename: a.nombre });
-									imagenes.set(a, img);
-								}
-								for (const l of img.render(Math.min(ancho - 4, 40))) lineas.push(`    ${l}`);
-							}
+							for (const l of vistaDe(a, ancho)) lineas.push(`    ${l}`);
 							const icono = a.imagen ? "▣" : a.nombre.endsWith("/") ? "▤" : "≡";
 							const texto = `  ${icono}  ${a.nombre}${a.bytes ? `  ·  ${tamano(a.bytes)}` : ""}   `;
 							const quitar = " ✕ quitar ";
@@ -751,7 +783,7 @@ export default function hilosenda(pi: ExtensionAPI) {
 						return lineas;
 					},
 					invalidate() {
-						for (const img of imagenes.values()) img.invalidate();
+						cache.clear();
 					},
 					handleMouse(evento: EventoRaton) {
 						const zona = zonas.find((z) => z.y === evento.y && evento.x >= z.x0 && evento.x <= z.x1);
