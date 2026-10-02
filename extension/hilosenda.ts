@@ -410,7 +410,7 @@ export default function hilosenda(pi: ExtensionAPI) {
 								.map(([id, n]) => ({
 									id,
 									etiqueta: `${actual?.provider === id ? "● " : "  "}${nombreProveedor(id)}`,
-									detalle: `${n} modelo${n === 1 ? "" : "s"}${actual?.provider === id ? ` · en uso: ${nombreModelo(actual)}` : ""}`,
+									detalle: `${n === 1 ? tr("1 modelo") : tr("{0} modelos", [n])}${actual?.provider === id ? ` · ${tr("en uso: {0}", [nombreModelo(actual)])}` : ""}`,
 									buscarEn: id,
 									valor: id,
 								})),

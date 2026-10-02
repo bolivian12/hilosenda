@@ -1,205 +1,204 @@
-# hilosenda
+<p align="center"><img src="docs/icon.png" alt="hilosenda" width="128"></p>
 
-**Pi renovado: un asistente de IA para la consola que se usa con clics.**
+<h1 align="center">hilosenda</h1>
 
-hilosenda es una version "modeada" del agente de programacion [Pi](https://github.com/earendil-works/pi).
-Sigue siendo un programa de consola, pero esta pensado para alguien que **nunca uso algo asi**:
-todo se hace con botones y clics del raton, con explicaciones en español. Para quien ya conoce
-Pi, **todos los comandos originales siguen funcionando** (escribe `/` dentro del chat).
+<p align="center"><b><a href="README.md">English</a> · <a href="README.es.md">Español</a> · <a href="README.pt.md">Português</a> · <a href="README.fr.md">Français</a> · <a href="README.de.md">Deutsch</a> · <a href="README.it.md">Italiano</a></b></p>
 
-```
-        ╻ ╻ ╻ ╻   ┏━┓ ┏━┓ ┏━╸ ┏┓╻ ╺┳┓ ┏━┓
-        ┣━┫ ┃ ┃   ┃ ┃ ┗━┓ ┣╸  ┃┗┫  ┃┃ ┣━┫
-        ╹ ╹ ╹ ┗━╸ ┗━┛ ┗━┛ ┗━╸ ╹ ╹ ╺┻┛ ╹ ╹
-         tu senda con la IA, hilo a hilo
-```
+**Pi, renewed: a console AI assistant you use with mouse clicks.**
 
-## Instalar
+hilosenda is a "modded" version of the [Pi](https://github.com/earendil-works/pi) coding agent.
+It is still a console program, but it is designed for someone who **has never used anything like
+it**: everything works with buttons and mouse clicks, with explanations in your language. If you
+already know Pi, **all the original commands still work** (type `/` inside the chat).
 
-No necesitas instalar nada antes: si tu computadora no tiene Node.js, el instalador descarga
-una copia privada solo para hilosenda. No pide permisos de administrador.
 
-**Windows** (abre PowerShell y pega):
+## Screenshots
+
+<table>
+<tr><td width="50%"><img src="docs/img/home.png" alt="Home screen"><br><sub>Home screen</sub></td><td width="50%"><img src="docs/img/chat-reply.png" alt="Chat with the side panel"><br><sub>Chat with the side panel</sub></td></tr>
+<tr><td width="50%"><img src="docs/img/models.png" alt="Choosing a model by provider"><br><sub>Choosing a model by provider</sub></td><td width="50%"><img src="docs/img/connect.png" alt="Connecting any AI"><br><sub>Connecting any AI</sub></td></tr>
+<tr><td width="50%"><img src="docs/img/settings.png" alt="Settings (including language)"><br><sub>Settings (including language)</sub></td><td width="50%"><img src="docs/img/tutorial.png" alt="Guided tutorial on first run"><br><sub>Guided tutorial on first run</sub></td></tr>
+</table>
+
+## Install
+
+You don't need anything installed first: if your computer has no Node.js, the installer
+downloads a private copy just for hilosenda. It never asks for administrator rights.
+
+**Windows** (open PowerShell and paste):
 
 ```powershell
-powershell -ExecutionPolicy Bypass -c "irm https://raw.githubusercontent.com/bolivian12/pruebarepositori/main/install/install.ps1 | iex"
+powershell -ExecutionPolicy Bypass -c "irm https://raw.githubusercontent.com/bolivian12/hilosenda/main/install/install.ps1 | iex"
 ```
 
-O descarga [`install/install.cmd`](install/install.cmd) y hazle doble clic. Se crea un acceso
-directo **hilosenda** en el Escritorio y en el menu Inicio.
+Or download [`install/install.cmd`](install/install.cmd) and double-click it. A **hilosenda**
+shortcut is created on the Desktop and in the Start menu.
 
-**macOS y Linux** (abre la Terminal y pega):
+**macOS and Linux** (open the Terminal and paste):
 
 ```sh
-curl -fsSL https://raw.githubusercontent.com/bolivian12/pruebarepositori/main/install/install.sh | sh
+curl -fsSL https://raw.githubusercontent.com/bolivian12/hilosenda/main/install/install.sh | sh
 ```
 
-En macOS aparece `hilosenda.command` en el Escritorio; en Linux, hilosenda aparece en el menu de
-aplicaciones. Tambien puedes escribir `hilosenda` en cualquier terminal.
+On macOS, `hilosenda.command` appears on the Desktop; on Linux, hilosenda appears in the
+applications menu. You can also type `hilosenda` in any terminal.
 
-> Para instalar otra rama (por ejemplo, una version en pruebas) define `HILOSENDA_REF`:
-> `curl -fsSL …/install.sh | HILOSENDA_REF=mi-rama sh`
+> To install another branch (for example a test version), set `HILOSENDA_REF`:
+> `curl -fsSL …/install.sh | HILOSENDA_REF=my-branch sh`
 
-**Si el repositorio es privado**, los enlaces de arriba dan error 404 (GitHub no deja descargar
-sin iniciar sesion). Descargalo con git, que si usa tu cuenta, y ejecuta el instalador desde ahi:
+You can also download it with git and run the installer from there:
 
 ```sh
-git clone https://github.com/bolivian12/pruebarepositori.git hilosenda
+git clone https://github.com/bolivian12/hilosenda.git hilosenda
 cd hilosenda
-sh install/install.sh        # en Windows: powershell -ExecutionPolicy Bypass -File install\install.ps1
+sh install/install.sh        # on Windows: powershell -ExecutionPolicy Bypass -File install\install.ps1
 ```
 
-**NixOS**: el instalador lo detecta y obtiene Node.js con Nix (los programas genericos de Linux
-no funcionan en NixOS). Si usas home-manager, agrega `~/.local/bin` a `home.sessionPath`.
-Recomendado tambien: `fd` y `ripgrep` instalados con Nix, porque Pi los usa para buscar archivos.
+**NixOS**: the installer detects it and gets Node.js through Nix (generic Linux programs don't
+run on NixOS). If you use home-manager, add `~/.local/bin` to `home.sessionPath`. Also
+recommended: `fd` and `ripgrep` installed with Nix, since Pi uses them to search files.
 
-Si ya tienes Node.js 22.19 o mas nuevo, tambien puedes instalarlo con npm:
+If you already have Node.js 22.19 or newer, you can also install it with npm:
 
 ```sh
-npm install -g --ignore-scripts github:bolivian12/pruebarepositori
+npm install -g --ignore-scripts github:bolivian12/hilosenda
 ```
 
-## Empezar en 3 pasos
+## Get started in 3 steps
 
-1. **Conecta una IA.** Pulsa «Conectar una IA». Si tienes Ollama o LM Studio abiertos, se detectan
-   solos. Si prefieres una IA en la nube (Claude, GPT, Gemini, OpenRouter...), pega tu clave API:
-   hilosenda **detecta automaticamente todos los modelos disponibles**.
-2. **Elige una carpeta.** Pulsa «Elegir carpeta» y se abre la ventana normal de tu sistema para
-   elegirla: el selector de Windows, el de macOS o, en Linux, el de tu escritorio (GNOME, KDE,
-   Hyprland...) a traves del portal de escritorio. Si no hay ventanas (por ejemplo por SSH), se
-   abre un explorador dentro de la consola.
-3. **Chatea.** Pulsa «Empezar a chatear», escribe lo que necesitas en lenguaje normal y pulsa Enter.
+1. **Connect an AI.** Press «Connect an AI». If Ollama or LM Studio are open, they are detected
+   automatically. If you prefer a cloud AI (Claude, GPT, Gemini, OpenRouter...), paste your API
+   key: hilosenda **automatically detects every available model**.
+2. **Choose a folder.** Press «Choose folder» and your system's normal window opens: the Windows
+   or macOS picker or, on Linux, your desktop's (GNOME, KDE, Hyprland...) through the desktop
+   portal. Without windows (for example over SSH), an explorer opens inside the console.
+3. **Chat.** Press «Start chatting», type what you need in plain language and press Enter.
 
-## Que trae
+A guided tutorial, practiced with the mouse, runs the first time you open hilosenda.
 
-**Pantalla de inicio** (con animacion de entrada)
-- Boton grande «Empezar a chatear» y botones para todo lo demas.
-- Carpetas recientes y **conversaciones anteriores** con buscador por cualquier palabra.
-- Aviso automatico si detecta IA instalada en tu computadora.
+## What's included
 
-**Conectar cualquier IA, sin depender de un proveedor**
-- En tu PC: Ollama, LM Studio, llama.cpp, vLLM, Jan.
-- En la nube: Anthropic, OpenAI, Google Gemini, OpenRouter, Groq, DeepSeek, Mistral, xAI,
+**Home screen** (with a startup animation)
+- A big «Start chatting» button and buttons for everything else.
+- Recent folders and **previous conversations**, searchable by any word.
+- Automatic notice when AI is detected on your computer.
+
+**Connect any AI, with no single provider**
+- On your PC: Ollama, LM Studio, llama.cpp, vLLM, Jan.
+- In the cloud: Anthropic, OpenAI, Google Gemini, OpenRouter, Groq, DeepSeek, Mistral, xAI,
   Cerebras, Together, Fireworks, Moonshot, NVIDIA.
-- Con tu cuenta: Claude Pro/Max, ChatGPT, GitHub Copilot (abre `/login` de Pi).
-- **Cualquier otra direccion** compatible con OpenAI, Anthropic o Google: escribes la URL y
-  hilosenda averigua el protocolo y lista sus modelos.
-- Los modelos que Pi ya trae siguen apareciendo por defecto.
+- With your account: Claude Pro/Max, ChatGPT, GitHub Copilot (opens Pi's `/login`).
+- **Any other address** compatible with OpenAI, Anthropic or Google: type the URL and
+  hilosenda figures out the protocol and lists its models.
+- Search models by provider and remove providers you no longer use.
 
-**Dentro del chat** (diseño tranquilo, pensado para quien empieza)
-- Un saludo sencillo y tarjetas con ideas para empezar, que se envian con un clic.
-- Barra de botones sencilla: Menu, Modelo, Nuevo chat e Inicio, y **Detener** mientras la IA
-  trabaja. En Ajustes se puede activar la barra completa (razonamiento, permisos, instrucciones,
-  carpeta, historial).
-- **Menu** con todas las funciones de Pi explicadas en español (tambien con `F1`).
-- Cambiar de carpeta sin salir: hilosenda reabre el chat en la nueva carpeta.
-- El borrador que estabas escribiendo no se pierde al pulsar botones.
+**Inside the chat** (a calm design for beginners)
+- A side panel with large buttons: attach file, change model, reasoning, previous chats,
+  new chat, more options, home, and **Stop** while the AI works.
+- The chosen model is always visible.
+- **Images and documents**: attach them with the button, Ctrl+V, right-click or drag and drop,
+  with a preview before sending.
+- Paste works in every field and dialog.
 
-**Permisos**
-- *Preguntarme antes* (por defecto): antes de crear o cambiar archivos o ejecutar comandos,
-  aparece un cuadro con lo que la IA quiere hacer y botones «Permitir», «Permitir siempre en este
-  chat», «No permitir» y «No, y decirle por que».
-- *Libre*: como Pi original, sin preguntas.
-- *Solo mirar*: la IA puede leer tu proyecto pero no cambiar nada.
+**Permissions**
+- *Ask me first* (default): before creating or changing files or running commands, a box shows
+  what the AI wants to do, with «Allow», «Always allow in this chat», «Don't allow» and
+  «No, and tell it why».
+- *Free*: like the original Pi, no questions.
+- *Read only*: the AI can read your project but change nothing.
 
-**Instrucciones**
-- Elige libremente cualquier archivo `.md` o `.txt` con reglas para la IA (idioma, estilo,
-  tecnologias...). Se lee antes de cada respuesta, asi que puedes editarlo cuando quieras.
+**Instructions**
+- Freely choose any `.md` or `.txt` file with rules for the AI (language, style,
+  technologies...). It is read before every reply, so you can edit it anytime.
 
-**Aspecto de aplicacion de escritorio**: botones con forma de pildora, tarjetas con esquinas
-redondeadas que se iluminan al pasar el raton, barra de titulo con ✕, barra de estado inferior
-clicable (modelo, razonamiento, carpeta, uso de memoria y costo) y temas propios claro y oscuro
-para todo el chat.
+**Desktop-app look**: pill-shaped buttons, rounded cards that light up on hover, a title bar
+with ✕, a clickable status bar (model, reasoning, folder, memory use and cost) and its own light
+and dark themes.
 
-**Ajustes**: tema (automatico, oscuro o claro), razonamiento por defecto, barra de botones,
-consejos para principiantes, animacion, ventana del sistema para carpetas, conexiones guardadas.
+**Languages**: Spanish, English, Portuguese, French, German and Italian. hilosenda uses your
+system's language automatically (`LANG`, `LC_ALL`, or the Windows/macOS regional settings) and the
+AI replies in that language. Change it in **Settings → Language**. Translations live in
+`src/idiomas/<code>.json`.
 
-### Idiomas
+## Commands
 
-hilosenda habla español, English, Português, Français, Deutsch e Italiano. Usa
-automaticamente el idioma de tu sistema (`LANG`, `LC_ALL`, o la configuracion regional de
-Windows/macOS) y la IA responde en ese idioma. Puedes cambiarlo en **Ajustes → Idioma**.
-Las traducciones estan en `src/idiomas/<codigo>.json`.
+Everything can be done with clicks, but there are also commands:
 
-## Comandos
-
-Todo se puede hacer con clics, pero tambien hay comandos en español:
-
-| Comando | Que hace |
+| Command | What it does |
 |---|---|
-| `/menu` | Todas las funciones con explicaciones |
-| `/modelo [texto]` | Elegir modelo (con texto, filtra la lista) |
-| `/razonamiento [nivel]` | apagado, minimo, bajo, medio, alto, muy alto, maximo |
-| `/permisos [modo]` | preguntar, libre o solo mirar |
-| `/instrucciones [archivo]` | Elegir el archivo de instrucciones |
-| `/carpeta [ruta]` | Abrir el chat en otra carpeta |
-| `/historial` | Buscar y continuar conversaciones anteriores |
-| `/conectar` | Conectar una IA nueva |
-| `/nuevo` | Conversacion nueva |
-| `/ajustes` | Ajustes de hilosenda |
-| `/inicio` | Volver a la pantalla de inicio |
-| `/ayuda` | Ayuda paso a paso |
+| `/menu` | Every feature, with explanations |
+| `/modelo [text]` | Choose model (text filters the list) |
+| `/razonamiento [level]` | Reasoning level |
+| `/permisos [mode]` | Ask, free or read only |
+| `/instrucciones [file]` | Choose the instructions file |
+| `/carpeta [path]` | Open the chat in another folder |
+| `/historial` | Search and continue previous conversations |
+| `/conectar` | Connect a new AI |
+| `/nuevo` | New conversation |
+| `/ajustes` | hilosenda settings |
+| `/inicio` | Back to the home screen |
+| `/ayuda` | Step-by-step help |
 
-Y todos los de Pi: `/model`, `/thinking`, `/tree`, `/fork`, `/compact`, `/login`, `/settings`,
+Plus all of Pi's: `/model`, `/thinking`, `/tree`, `/fork`, `/compact`, `/login`, `/settings`,
 `/resume`, `/export`, `/hotkeys`...
 
-Desde la terminal:
+From the terminal:
 
 ```
-hilosenda                  pantalla de inicio
-hilosenda <carpeta>        abre el chat directamente en esa carpeta
-hilosenda --continuar      continua la ultima conversacion de la carpeta actual
-hilosenda -- <opciones>    pasa opciones directamente a Pi
+hilosenda                  home screen
+hilosenda <folder>         open the chat directly in that folder
+hilosenda --continuar      continue the last conversation in the current folder
+hilosenda -- <options>     pass options straight to Pi
 ```
 
-## Consejos
+## Tips
 
-- El raton funciona en Windows Terminal, la Terminal de macOS, iTerm2, GNOME Terminal, Konsole,
-  Ghostty, WezTerm y la mayoria de terminales modernas. En Windows se recomienda
-  [Windows Terminal](https://aka.ms/terminal).
-- Todo tiene tambien manejo con teclado: flechas, Tab, Enter y Esc.
-- En Linux, la ventana para elegir carpetas usa el portal de escritorio (`xdg-desktop-portal`), que
-  ya viene con GNOME y KDE. Si no lo tienes, usa `zenity` o `kdialog`; en NixOS puede obtener
-  `zenity` con Nix automaticamente.
+- The mouse works in Windows Terminal, macOS Terminal, iTerm2, GNOME Terminal, Konsole,
+  Ghostty, WezTerm and most modern terminals. On Windows, [Windows Terminal](https://aka.ms/terminal)
+  is recommended.
+- Everything also works with the keyboard: arrows, Tab, Enter and Esc.
+- On Linux, the folder window uses the desktop portal (`xdg-desktop-portal`), included with
+  GNOME and KDE. Otherwise it uses `zenity` or `kdialog`; on NixOS it can fetch `zenity` via Nix.
 
-## Donde se guardan las cosas
+## Where things are stored
 
-- Preferencias de hilosenda: `~/.hilosenda/preferencias.json`
-- Configuracion de Pi (modelos, claves, conversaciones): `~/.pi/agent/`. hilosenda comparte esta
-  carpeta con Pi, asi que lo que configures en uno sirve para el otro.
-- Las claves API se guardan solo en tu computadora, con permisos privados.
+- hilosenda preferences: `~/.hilosenda/preferencias.json`
+- Pi configuration (models, keys, conversations): `~/.pi/agent/`. hilosenda shares this folder
+  with Pi, so whatever you set up in one works in the other.
+- API keys are stored only on your computer, with private permissions.
 
-## Desinstalar
+## Uninstall
 
-- **Windows**: borra la carpeta `%LOCALAPPDATA%\hilosenda` y los accesos directos.
+- **Windows**: delete the `%LOCALAPPDATA%\hilosenda` folder and the shortcuts.
 - **macOS / Linux**: `rm -rf ~/.hilosenda ~/.local/bin/hilosenda ~/.local/share/applications/hilosenda.desktop`
 
-Tus conversaciones y claves en `~/.pi/agent` no se borran; eliminalas si ya no las quieres.
+Your conversations and keys in `~/.pi/agent` are not deleted; remove them if you no longer want them.
 
-## Como esta hecho
+## How it's built
 
-hilosenda **no modifica el codigo de Pi**: lo instala como dependencia y lo amplia con su sistema
-oficial de extensiones. Por eso las mejoras de Pi llegan simplemente actualizando la version.
+hilosenda **does not modify Pi's code**: it installs Pi as a dependency and extends it through
+its official extension system, so Pi's improvements arrive just by updating the version.
 
 ```
-bin/hilosenda.js          comando de entrada
-src/inicio/app.js         pantalla de inicio (centro de control)
-extension/hilosenda.ts    extension que se carga dentro de Pi (barra, menu, permisos...)
-src/flujos/               asistentes compartidos: conectar IA, carpetas, instrucciones
-src/core/                 deteccion de modelos, configuracion, ventanas del sistema
-src/ui/                   botones, tarjetas, listas, campos y animacion (raton + teclado)
-temas/                    temas de colores claro y oscuro para el chat
-install/                  instaladores para Windows, macOS y Linux
+bin/hilosenda.js          entry command
+src/inicio/app.js         home screen (control center)
+extension/hilosenda.ts    extension loaded inside Pi (side panel, menu, permissions...)
+src/flujos/               shared wizards: connect AI, folders, instructions
+src/core/                 model detection, configuration, system windows
+src/ui/                   buttons, cards, lists, fields and animation (mouse + keyboard)
+src/idiomas/              translations
+temas/                    light and dark color themes for the chat
+install/                  installers for Windows, macOS and Linux
 ```
 
-Desarrollo:
+Development:
 
 ```sh
 npm install --ignore-scripts
-npm start          # ejecuta hilosenda desde el codigo
-npm test           # pruebas
+npm start          # run hilosenda from source
+npm test           # tests
 ```
 
-## Licencia
+## License
 
-MIT. Basado en [Pi](https://github.com/earendil-works/pi) (MIT, © Mario Zechner).
+MIT. Based on [Pi](https://github.com/earendil-works/pi) (MIT, © Mario Zechner).
