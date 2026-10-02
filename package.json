@@ -1,0 +1,35 @@
+{
+	"name": "hilosenda",
+	"version": "0.1.0",
+	"description": "Pi renovado: agente de IA para la consola, facil de usar con el raton y con comandos.",
+	"type": "module",
+	"license": "MIT",
+	"bin": {
+		"hilosenda": "bin/hilosenda.js"
+	},
+	"files": [
+		"bin",
+		"src",
+		"extension",
+		"temas",
+		"install",
+		"README.md",
+		"LICENSE"
+	],
+	"scripts": {
+		"start": "node bin/hilosenda.js",
+		"test": "node --test test/*.test.js",
+		"check": "tsc -p tsconfig.json"
+	},
+	"engines": {
+		"node": ">=22.19.0"
+	},
+	"dependencies": {
+		"@earendil-works/pi-coding-agent": "1.0.0",
+		"@earendil-works/pi-tui": "1.0.0"
+	},
+	"devDependencies": {
+		"@types/node": "^22.19.19",
+		"typescript": "^5.9.3"
+	}
+}
