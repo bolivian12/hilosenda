@@ -84,54 +84,122 @@ const SUGERENCIAS = [
 	{ id: "ideas", icono: "✦", etiqueta: "¿Qué puedes hacer?", detalle: "Ideas para empezar", texto: "¿Qué cosas puedes hacer por mí en esta carpeta? Dame ejemplos concretos." },
 ];
 
+/** Boton de la columna lateral. */
+type BotonLateral = { id: string; icono: string; etiqueta: string; peligro?: boolean };
+
+const ANCHO_COLUMNA = 20;
+
 /**
- * Cuadro de texto de Pi con titulo, pista de teclas y un boton «Enviar ▶» clicable.
- * Tambien permite que la barra de botones ejecute comandos (usa su onSubmit).
+ * Cuadro de texto con una columna de botones a su derecha:
+ *
+ *   ── ✎ Tu mensaje ───────────────┬──────────────────
+ *   escribe aqui…                  │  ≡  Menú
+ *                                  │  ◆  modelo
+ *                                  │  ✚  Nuevo chat
+ *                                  │  ⌂  Inicio
+ *   ───────────────────────────────┴──  Enviar ▶
+ *
+ * Tambien permite que los botones ejecuten comandos (usa el onSubmit del editor).
  */
 class EditorHilosenda extends CustomEditor {
 	estilo: () => Estilo = () => crearEstilo();
-	alMover?: () => void;
-	private hoverEnviar = false;
-	private zonaEnviar?: { x0: number; x1: number };
+	botones: () => BotonLateral[] = () => [];
+	alPulsar?: (id: string) => void;
+	private hover = "";
+	private presionado = "";
+	private anchoEditor = 0;
+	private filasContenido = 0;
+	private filaEnviar = -1;
 
 	protected override renderTopBorder(width: number, hiddenLineCount: number): string {
 		if (hiddenLineCount > 0 || this.embedWorkingStatus) return super.renderTopBorder(width, hiddenLineCount);
 		const e = this.estilo();
 		const etiqueta = " ✎ Tu mensaje ";
-		return this.borderColor("──") + e.pintar(etiqueta, { fg: e.c.suave, negrita: true }) + this.borderColor("─".repeat(Math.max(0, width - 2 - visibleWidth(etiqueta))));
+		return this.borderColor("──") + e.pintar(etiqueta, { fg: e.c.suave }) + this.borderColor("─".repeat(Math.max(0, width - 2 - visibleWidth(etiqueta))));
 	}
 
-	protected override renderBottomBorder(width: number, hiddenLineCount: number): string {
+	private conColumna(width: number): boolean {
+		const autocompletando = Boolean((this as unknown as { autocompleteState?: unknown }).autocompleteState);
+		return width >= 60 && !autocompletando;
+	}
+
+	override render(width: number): string[] {
+		if (!this.conColumna(width)) {
+			this.anchoEditor = 0;
+			return super.render(width);
+		}
 		const e = this.estilo();
-		const boton = " Enviar ▶ ";
-		const anchoBoton = visibleWidth(boton) + 2;
-		if (width < anchoBoton + 10) return super.renderBottomBorder(width, hiddenLineCount);
-		const pista = hiddenLineCount > 0 ? ` ↓ ${hiddenLineCount} líneas más ` : " Enter envía · Shift+Enter: nueva línea ";
+		const anchoEditor = width - ANCHO_COLUMNA - 1;
+		this.anchoEditor = anchoEditor;
+		const lineas = super.render(anchoEditor);
+		const borde = (t: string) => this.borderColor(t);
+		const botones = this.botones();
+		const superior = lineas[0];
+		const inferior = lineas[lineas.length - 1];
+		const contenido = lineas.slice(1, -1);
+		this.filasContenido = contenido.length;
+		while (contenido.length < botones.length) contenido.push(" ".repeat(anchoEditor));
+
+		const salida = [`${superior}${borde(`┬${"─".repeat(ANCHO_COLUMNA)}`)}`];
+		contenido.forEach((linea, i) => {
+			const b = botones[i];
+			let celda = " ".repeat(ANCHO_COLUMNA);
+			if (b) {
+				const encima = this.hover === b.id || this.presionado === b.id;
+				const texto = recortar(`  ${b.icono}  ${b.etiqueta}`, ANCHO_COLUMNA - 1);
+				const relleno = " ".repeat(Math.max(0, ANCHO_COLUMNA - visibleWidth(texto)));
+				const fg = b.peligro ? e.c.error : encima ? e.c.texto : e.c.suave;
+				celda = e.pintar(texto + relleno, { fg, bg: encima ? e.c.tarjetaHover : undefined, negrita: encima || b.peligro });
+			}
+			salida.push(`${linea}${borde("│")}${celda}`);
+		});
 		const vacio = this.getText().trim() === "";
-		const fondo = vacio ? e.c.tarjeta : this.hoverEnviar ? e.mezclar(e.c.acento, e.c.texto, 0.25) : e.c.acento;
-		const frente = vacio ? e.c.tenue : e.c.textoSobreAcento;
-		const pistaVisible = recortar(pista, Math.max(0, width - anchoBoton - 6));
-		const relleno = Math.max(0, width - 2 - visibleWidth(pistaVisible) - anchoBoton - 2);
-		this.zonaEnviar = { x0: width - 2 - anchoBoton, x1: width - 3 };
-		return this.borderColor("──") + e.pintar(pistaVisible, { fg: e.c.tenue }) + this.borderColor("─".repeat(relleno)) + e.pastilla(boton, fondo, frente) + this.borderColor("──");
+		const fondo = vacio ? e.c.tarjeta : this.hover === "enviar" ? e.mezclar(e.c.acento, e.c.texto, 0.25) : e.c.acento;
+		const enviar = e.pastilla("  Enviar ▶  ", fondo, vacio ? e.c.tenue : e.c.textoSobreAcento);
+		const resto = Math.max(0, ANCHO_COLUMNA - visibleWidth(enviar) - 1);
+		salida.push(`${inferior}${borde(`┴${"─".repeat(resto)}`)}${enviar} `);
+		this.filaEnviar = salida.length - 1;
+		return salida;
+	}
+
+	private objetivo(evento: EventoRaton): string {
+		if (!this.anchoEditor || evento.x <= this.anchoEditor) return "";
+		if (evento.y === this.filaEnviar) return "enviar";
+		const b = this.botones()[evento.y - 1];
+		return evento.y >= 1 && b ? b.id : "";
 	}
 
 	override handleMouse(evento: EventoRaton) {
-		const filaInferior = ((this as unknown as { renderedVisibleLineCount?: number }).renderedVisibleLineCount ?? 0) + 1;
-		const sobre = Boolean(this.zonaEnviar && evento.y === filaInferior && evento.x >= this.zonaEnviar.x0 && evento.x <= this.zonaEnviar.x1);
+		const id = this.objetivo(evento);
 		if (evento.type === "move" || evento.type === "drag") {
-			this.alMover?.();
-			if (sobre !== this.hoverEnviar) {
-				this.hoverEnviar = sobre;
+			if (id !== this.hover) {
+				this.hover = id;
 				return { handled: true, render: true };
 			}
-			return super.handleMouse(evento);
+			return id ? { handled: true, render: false } : super.handleMouse(evento);
 		}
-		if (sobre && evento.button === "left") {
-			if (evento.type === "click" && this.getText().trim() !== "") this.handleInput("\r");
+		if (this.anchoEditor && evento.x > this.anchoEditor) {
+			if (evento.button !== "left") return { handled: true };
+			if (evento.type === "press") {
+				this.presionado = id;
+				return { handled: true, render: true };
+			}
+			if (evento.type === "click" || evento.type === "release") {
+				const pulsado = this.presionado;
+				this.presionado = "";
+				if (id && id === pulsado) {
+					if (id === "enviar") {
+						if (this.getText().trim() !== "") this.handleInput("\r");
+					} else this.alPulsar?.(id);
+				}
+				return { handled: true, render: true };
+			}
 			return { handled: true };
 		}
-		return super.handleMouse(evento);
+		// Filas de relleno debajo del texto: clic = enfocar el cuadro.
+		if (this.anchoEditor && evento.y > this.filasContenido && evento.y < this.filaEnviar) return { handled: true, focus: true };
+		if (this.anchoEditor && evento.y === this.filaEnviar) return super.handleMouse({ ...evento, y: this.filasContenido + 1 });
+		return super.handleMouse({ ...evento, width: this.anchoEditor || evento.width });
 	}
 }
 
@@ -544,6 +612,18 @@ export default function hilosenda(pi: ExtensionAPI) {
 
 	// --- Barra de botones ----------------------------------------------------------
 
+	function botonesLaterales(): BotonLateral[] {
+		const lista: BotonLateral[] = [];
+		if (trabajando) lista.push({ id: "detener", icono: "■", etiqueta: "Detener", peligro: true });
+		lista.push(
+			{ id: "menu", icono: "≡", etiqueta: "Menú" },
+			{ id: "modelo", icono: "◆", etiqueta: nombreModelo(ctxActual?.model) },
+			{ id: "nuevo", icono: "✚", etiqueta: "Nuevo chat" },
+			{ id: "inicio", icono: "⌂", etiqueta: "Inicio" },
+		);
+		return lista;
+	}
+
 	function botonesBarra(compacta = false) {
 		const ctx = ctxActual;
 		const p = leerPreferencias();
@@ -812,13 +892,15 @@ export default function hilosenda(pi: ExtensionAPI) {
 			ctx.ui.setEditorComponent((tui, tema, teclas) => {
 				editor = new EditorHilosenda(tui, tema, teclas);
 				editor.estilo = estiloActual;
-				editor.alMover = limpiarHovers;
+				editor.botones = botonesLaterales;
+				editor.alPulsar = (id) => {
+					if (ctxActual) void ejecutarAccion(ctxActual, id);
+				};
 				return editor;
 			});
 		}
-		const sinMensajes = !ctx.sessionManager.getEntries().some((e) => e.type === "message");
-		if (sinMensajes && leerPreferencias().modoPrincipiante) instalarSugerencias(ctx);
-		instalarBarra(ctx);
+		// La columna lateral reemplaza a la barra; si otra extension cambio el editor, se usa la barra.
+		if (!editor || leerPreferencias().barraCompleta) instalarBarra(ctx);
 		instalarCabecera(ctx);
 		instalarPie(ctx);
 		aplicarModoPermisos(ctx);
@@ -833,6 +915,7 @@ export default function hilosenda(pi: ExtensionAPI) {
 
 	const recordar = (_e: unknown, ctx: ExtensionContext) => {
 		ctxActual = ctx;
+		editor?.invalidate();
 		pedirRenderBarra?.();
 	};
 	pi.on("model_select", recordar);
