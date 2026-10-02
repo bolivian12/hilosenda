@@ -129,6 +129,7 @@ export class App {
 		await this.detectarFondo();
 		if (this.animacion && !entrarDirecto) await this.reproducirAnimacion();
 		this.refrescarDatos();
+		if (!this.preferencias.bienvenidaVista && !entrarDirecto) await this.tutorial();
 		if (entrarDirecto && this.carpeta) await this.entrarAlChat({ argumentos });
 		while (true) {
 			const accion = await this.pantallaInicio();
@@ -289,9 +290,19 @@ export class App {
 			case "ajustes":
 				await this.ajustes();
 				break;
-			case "ayuda":
-				await ui.informar({ titulo: "Como usar hilosenda", texto: AYUDA_GENERAL });
+			case "ayuda": {
+				const que = await ui.botones({
+					titulo: "Ayuda",
+					explicacion: "¿Qué prefieres?",
+					botones: [
+						{ id: "tutorial", etiqueta: "Ver el tutorial guiado", tipo: "primario", ayuda: "Paso a paso, practicando con el ratón" },
+						{ id: "texto", etiqueta: "Leer la guía", ayuda: "Toda la explicación en una pantalla" },
+					],
+				});
+				if (que === "tutorial") await this.tutorial();
+				else if (que === "texto") await ui.informar({ titulo: "Cómo usar hilosenda", texto: AYUDA_GENERAL });
 				break;
+			}
 		}
 	}
 
@@ -299,6 +310,121 @@ export class App {
 		this.carpeta = ruta;
 		this.preferencias = agregarReciente(ruta);
 		this.mensaje = { texto: `Carpeta elegida: ${rutaBonita(ruta)}`, tipo: "exito" };
+	}
+
+	/**
+	 * Tutorial guiado para la primera vez: practica el raton, conecta una IA, elige
+	 * carpeta y explica el chat. Se puede saltar en cualquier momento.
+	 */
+	async tutorial() {
+		const ui = this.dialogos;
+		const total = 6;
+		const paso = (n, titulo) => `Tutorial ${n}/${total} · ${titulo}`;
+		const saltar = { id: "saltar", etiqueta: "Saltar tutorial", tipo: "suave", ayuda: "Puedes volver a verlo desde Ayuda" };
+		const terminar = () => {
+			this.preferencias = guardarPreferencias({ bienvenidaVista: true });
+		};
+
+		// 1. Bienvenida
+		let r = await ui.botones({
+			titulo: paso(1, "Bienvenida"),
+			explicacion:
+				"¡Hola! hilosenda es un asistente de inteligencia artificial que trabaja con los archivos de tu computadora: explica, escribe, corrige y organiza por ti.\n\nEste tutorial dura un minuto. Todo se hace con el ratón: haz clic en los botones como en cualquier programa.",
+			botones: [{ id: "seguir", etiqueta: "▶  Empezar el tutorial", tipo: "primario", ayuda: "¡Así se ve un botón cuando pasas el ratón encima!" }, saltar],
+		});
+		if (r !== "seguir") return terminar();
+
+		// 2. Practicar el raton
+		let intentos = 0;
+		while (true) {
+			r = await ui.botones({
+				titulo: paso(2, "Practica con el ratón"),
+				explicacion:
+					intentos === 0
+						? "Mueve el ratón sobre los botones: se iluminan. Ahora haz clic en el botón verde que dice «¡Aquí!»."
+						: "¡Casi! Ese no era. Busca el botón verde que dice «¡Aquí!» y haz clic en él.",
+				botones: [
+					{ id: "no1", etiqueta: "Este no" },
+					{ id: "si", etiqueta: "¡Aquí!", tipo: "primario" },
+					{ id: "no2", etiqueta: "Este tampoco" },
+				],
+			});
+			if (r === "si") break;
+			if (r === undefined) return terminar();
+			intentos++;
+		}
+		r = await ui.botones({
+			titulo: paso(2, "Practica con el ratón"),
+			explicacion:
+				"¡Perfecto!\n\nTambién puedes usar el teclado si lo prefieres: las flechas o Tab para moverte, Enter para elegir y Esc para volver atrás. En las listas largas, la rueda del ratón sirve para desplazarte.",
+			botones: [{ id: "seguir", etiqueta: "Siguiente  ▶", tipo: "primario" }, saltar],
+		});
+		if (r !== "seguir") return terminar();
+
+		// 3. Conectar una IA
+		const hayIA = Boolean(modeloPorDefecto()) || this.modelos.length > 0;
+		r = await ui.botones({
+			titulo: paso(3, "Conecta una IA"),
+			explicacion: hayIA
+				? "Ya tienes una IA conectada, así que puedes saltar este paso. Si quieres agregar otra (por ejemplo una gratuita en tu PC con Ollama), pulsa «Conectar otra»."
+				: "hilosenda necesita una IA para pensar. Puedes usar una gratis en tu computadora (Ollama) o una en internet (Claude, GPT, Gemini…) pegando su clave.\n\nNo te preocupes: el asistente te guía y detecta los modelos solo.",
+			botones: [
+				{ id: "conectar", etiqueta: hayIA ? "Conectar otra" : "Conectar una IA ahora", tipo: hayIA ? "normal" : "primario" },
+				{ id: "seguir", etiqueta: hayIA ? "Siguiente  ▶" : "Más tarde", tipo: hayIA ? "primario" : "suave" },
+				saltar,
+			],
+		});
+		if (r === "saltar" || r === undefined) return terminar();
+		if (r === "conectar") await this.conectar();
+
+		// 4. Elegir carpeta
+		r = await ui.botones({
+			titulo: paso(4, "Elige una carpeta"),
+			explicacion: `La IA trabaja dentro de una carpeta: la de tu proyecto, tus documentos, lo que quieras.${this.carpeta ? `\n\nAhora mismo está elegida: ${rutaBonita(this.carpeta)}` : ""}\n\nAl pulsar «Elegir carpeta» se abre la ventana normal de tu sistema.`,
+			botones: [
+				{ id: "carpeta", etiqueta: "Elegir carpeta", tipo: this.carpeta ? "normal" : "primario" },
+				{ id: "seguir", etiqueta: this.carpeta ? "Usar esa y seguir  ▶" : "Más tarde", tipo: this.carpeta ? "primario" : "suave" },
+				saltar,
+			],
+		});
+		if (r === "saltar" || r === undefined) return terminar();
+		if (r === "carpeta") {
+			const ruta = await elegirCarpeta(ui, { inicio: this.carpeta, ventana: this.preferencias.selectorGrafico });
+			if (ruta) this.usarCarpeta(ruta);
+		}
+
+		// 5. El chat
+		r = await ui.botones({
+			titulo: paso(5, "Cómo es el chat"),
+			explicacion: [
+				"En el chat escribes abajo, como en WhatsApp, y pulsas «Enviar ▶» o Enter.",
+				"",
+				"A la derecha del cuadro de texto tienes botones para:",
+				"  ▣  adjuntar fotos o documentos (también puedes pegarlos con Ctrl+V o clic derecho)",
+				"  ◆  cambiar de modelo de IA",
+				"  ❝  ver tus chats anteriores",
+				"  ✚  empezar un chat nuevo",
+				"  ≡  ver todas las demás opciones",
+				"",
+				"Si la IA quiere cambiar un archivo o ejecutar algo, primero te pide permiso con botones.",
+				"Esc detiene a la IA en cualquier momento.",
+			].join("\n"),
+			botones: [{ id: "seguir", etiqueta: "Siguiente  ▶", tipo: "primario" }, saltar],
+		});
+		if (r !== "seguir") return terminar();
+
+		// 6. Fin
+		r = await ui.botones({
+			titulo: paso(6, "¡Listo!"),
+			explicacion:
+				"Ya sabes todo lo necesario. Ideas para tu primer mensaje:\n\n  «explícame qué hay en esta carpeta»\n  «ordena mis fotos por fecha»\n  «crea una página web sencilla sobre mi negocio»\n\nPuedes repetir este tutorial cuando quieras desde «Ayuda».",
+			botones: [
+				{ id: "chat", etiqueta: "▶  Empezar a chatear", tipo: "primario" },
+				{ id: "inicio", etiqueta: "Ir a la pantalla de inicio" },
+			],
+		});
+		terminar();
+		if (r === "chat") await this.entrarAlChat();
 	}
 
 	/** Espera datos que se cargan en segundo plano, mostrando una pantalla solo si hace falta. */
