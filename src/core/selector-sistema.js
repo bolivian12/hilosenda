@@ -67,7 +67,9 @@ function scriptWindows(tipo, titulo, inicio) {
 		...comun,
 		"$d = New-Object System.Windows.Forms.OpenFileDialog",
 		`$d.Title = ${cadenaPs(titulo)}`,
-		"$d.Filter = 'Instrucciones (*.md;*.txt)|*.md;*.markdown;*.txt|Todos los archivos (*.*)|*.*'",
+		tipo === "imagen"
+			? "$d.Filter = 'Imagenes (*.png;*.jpg;*.jpeg;*.gif;*.webp)|*.png;*.jpg;*.jpeg;*.gif;*.webp|Todos los archivos (*.*)|*.*'"
+			: "$d.Filter = 'Instrucciones (*.md;*.txt)|*.md;*.markdown;*.txt|Todos los archivos (*.*)|*.*'",
 		inicio ? `$d.InitialDirectory = ${cadenaPs(inicio)}` : "",
 		"if ($d.ShowDialog($duenio) -eq [System.Windows.Forms.DialogResult]::OK) { Write-Output $d.FileName }",
 	].join("; ");
@@ -96,7 +98,9 @@ async function elegirMac(tipo, titulo, inicio) {
 		tipo === "carpeta"
 			? [`POSIX path of (choose folder with prompt ${cadenaAs(titulo)}${desde})`]
 			: [
-					`POSIX path of (choose file with prompt ${cadenaAs(titulo)} of type {"md", "markdown", "txt", "public.plain-text"}${desde})`,
+					tipo === "imagen"
+						? `POSIX path of (choose file with prompt ${cadenaAs(titulo)} of type {"public.image"}${desde})`
+						: `POSIX path of (choose file with prompt ${cadenaAs(titulo)} of type {"md", "markdown", "txt", "public.plain-text"}${desde})`,
 					`POSIX path of (choose file with prompt ${cadenaAs(titulo)}${desde})`,
 				];
 	for (const script of intentos) {
@@ -112,6 +116,7 @@ async function elegirMac(tipo, titulo, inicio) {
 function argumentosZenity(tipo, titulo, desde) {
 	const args = ["--file-selection", `--title=${titulo}`];
 	if (tipo === "carpeta") args.push("--directory");
+	else if (tipo === "imagen") args.push("--file-filter=Imagenes | *.png *.PNG *.jpg *.JPG *.jpeg *.gif *.webp", "--file-filter=Todos | *");
 	else args.push("--file-filter=Instrucciones | *.md *.MD *.markdown *.txt *.TXT", "--file-filter=Todos | *");
 	if (desde) args.push(`--filename=${desde}`);
 	return args;
@@ -135,7 +140,7 @@ async function elegirLinux(tipo, titulo, inicio) {
 			"kdialog",
 			tipo === "carpeta"
 				? ["--title", titulo, "--getexistingdirectory", inicio ?? "."]
-				: ["--title", titulo, "--getopenfilename", inicio ?? ".", "*.md *.markdown *.txt|Instrucciones"],
+				: ["--title", titulo, "--getopenfilename", inicio ?? ".", tipo === "imagen" ? "*.png *.jpg *.jpeg *.gif *.webp|Imagenes" : "*.md *.markdown *.txt|Instrucciones"],
 		]);
 	}
 	for (const [programa, args] of opciones) {
@@ -157,12 +162,12 @@ async function elegirLinux(tipo, titulo, inicio) {
 
 /**
  * Abre la ventana del sistema para elegir una carpeta o un archivo de instrucciones.
- * @param {"carpeta" | "instrucciones"} tipo
+ * @param {"carpeta" | "instrucciones" | "imagen"} tipo
  * @param {{ titulo?: string, inicio?: string }} [opciones]
  * @returns {Promise<Resultado>}
  */
 export async function elegirConVentana(tipo, opciones = {}) {
-	const titulo = opciones.titulo ?? (tipo === "carpeta" ? "Elige la carpeta de tu proyecto" : "Elige el archivo de instrucciones (.md o .txt)");
+	const titulo = opciones.titulo ?? (tipo === "carpeta" ? "Elige la carpeta de tu proyecto" : tipo === "imagen" ? "Elige una imagen" : "Elige el archivo de instrucciones (.md o .txt)");
 	const inicio = opciones.inicio && existsSync(opciones.inicio) ? opciones.inicio : undefined;
 	try {
 		if (process.platform === "win32") return await elegirWindows(tipo, titulo, inicio);

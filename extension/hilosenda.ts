@@ -10,14 +10,14 @@
 
 import { existsSync, readFileSync, statSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
-import { basename } from "node:path";
+import { basename, extname } from "node:path";
 import type { ExtensionAPI, ExtensionCommandContext, ExtensionContext } from "@earendil-works/pi-coding-agent";
 import { CustomEditor, SessionManager } from "@earendil-works/pi-coding-agent";
 import { visibleWidth } from "@earendil-works/pi-tui";
 import { guardarAjustesPi } from "../src/core/pi-config.js";
 import { guardarPreferencias as guardarPreferenciasDisco, leerPreferencias as leerPreferenciasDisco } from "../src/core/preferencias.js";
 import { aIdentificador, conectarIA } from "../src/flujos/conectar.js";
-import { elegirCarpeta, nombreCorto } from "../src/flujos/explorar.js";
+import { elegirCarpeta, elegirImagen, nombreCorto } from "../src/flujos/explorar.js";
 import { elegirPermisos, gestionarInstrucciones, NIVELES, nombreNivel, PERMISOS, permisoPorId } from "../src/flujos/opciones.js";
 import { AYUDA_GENERAL } from "../src/textos.js";
 import { logoDegradado } from "../src/ui/animacion.js";
@@ -87,7 +87,7 @@ const SUGERENCIAS = [
 /** Boton de la columna lateral. */
 type BotonLateral = { id: string; icono: string; etiqueta: string; peligro?: boolean };
 
-const ANCHO_COLUMNA = 20;
+const ANCHO_COLUMNA = 24;
 
 /**
  * Cuadro de texto con una columna de botones a su derecha:
@@ -104,6 +104,10 @@ const ANCHO_COLUMNA = 20;
 class EditorHilosenda extends CustomEditor {
 	estilo: () => Estilo = () => crearEstilo();
 	botones: () => BotonLateral[] = () => [];
+	/** Texto extra en el borde superior: modelo en uso e imagenes adjuntas. */
+	detalle: () => string = () => "";
+	/** Hay algo para enviar aunque no haya texto (por ejemplo una imagen). */
+	hayAdjuntos: () => boolean = () => false;
 	alPulsar?: (id: string) => void;
 	private hover = "";
 	private presionado = "";
@@ -115,7 +119,9 @@ class EditorHilosenda extends CustomEditor {
 		if (hiddenLineCount > 0 || this.embedWorkingStatus) return super.renderTopBorder(width, hiddenLineCount);
 		const e = this.estilo();
 		const etiqueta = " ✎ Tu mensaje ";
-		return this.borderColor("──") + e.pintar(etiqueta, { fg: e.c.suave }) + this.borderColor("─".repeat(Math.max(0, width - 2 - visibleWidth(etiqueta))));
+		const extra = recortar(this.detalle(), Math.max(0, width - visibleWidth(etiqueta) - 6));
+		const texto = e.pintar(etiqueta, { fg: e.c.suave }) + (extra ? e.pintar(`${extra} `, { fg: e.c.texto, negrita: true }) : "");
+		return this.borderColor("──") + texto + this.borderColor("─".repeat(Math.max(0, width - 2 - visibleWidth(texto))));
 	}
 
 	private conColumna(width: number): boolean {
@@ -153,7 +159,7 @@ class EditorHilosenda extends CustomEditor {
 			}
 			salida.push(`${linea}${borde("│")}${celda}`);
 		});
-		const vacio = this.getText().trim() === "";
+		const vacio = this.getText().trim() === "" && !this.hayAdjuntos();
 		const fondo = vacio ? e.c.tarjeta : this.hover === "enviar" ? e.mezclar(e.c.acento, e.c.texto, 0.25) : e.c.acento;
 		const enviar = e.pastilla("  Enviar ▶  ", fondo, vacio ? e.c.tenue : e.c.textoSobreAcento);
 		const resto = Math.max(0, ANCHO_COLUMNA - visibleWidth(enviar) - 1);
@@ -189,6 +195,7 @@ class EditorHilosenda extends CustomEditor {
 				this.presionado = "";
 				if (id && id === pulsado) {
 					if (id === "enviar") {
+						if (this.getText().trim() === "" && this.hayAdjuntos()) this.setText("¿Qué ves en esta imagen?");
 						if (this.getText().trim() !== "") this.handleInput("\r");
 					} else this.alPulsar?.(id);
 				}
@@ -211,6 +218,7 @@ export default function hilosenda(pi: ExtensionAPI) {
 	let filaSugerencias: Mosaico | undefined;
 	let costoCache = { entradas: -1, total: 0 };
 	let trabajando = false;
+	const imagenesPendientes: Array<{ nombre: string; imagen: { type: "image"; data: string; mimeType: string } }> = [];
 	let dialogoAbierto = false;
 	let herramientasAntesDeLectura: string[] | undefined;
 	const permitidosEnSesion = new Set<string>();
@@ -467,6 +475,7 @@ export default function hilosenda(pi: ExtensionAPI) {
 		await conDialogo(ctx, async (ui) => {
 			const propios = [
 				{ id: "h:conectar", etiqueta: "Conectar una IA", detalle: "Agrega Ollama, Claude, GPT, Gemini o cualquier otra; detecta sus modelos solo", grupo: "hilosenda" },
+				{ id: "h:imagen", etiqueta: "Adjuntar imagen", detalle: "Envía una foto o captura junto a tu mensaje (también puedes pegarla con Ctrl+V)", grupo: "hilosenda" },
 				{ id: "h:modelo", etiqueta: "Elegir modelo", detalle: "Cambia la IA que responde", grupo: "hilosenda" },
 				{ id: "h:razonamiento", etiqueta: "Razonamiento", detalle: "Cuanto piensa la IA antes de responder", grupo: "hilosenda" },
 				{ id: "h:historial", etiqueta: "Conversaciones anteriores", detalle: "Busca y continua cualquier chat anterior", grupo: "hilosenda" },
@@ -599,6 +608,35 @@ export default function hilosenda(pi: ExtensionAPI) {
 			case "inicio":
 				if (!pedirAlInicio(ctx, { accion: "inicio" })) ctx.shutdown();
 				return;
+			case "imagen":
+				return conDialogo(ctx, async (ui) => {
+					if (imagenesPendientes.length) {
+						const que = await ui.botones({
+							titulo: "Imágenes adjuntas",
+							explicacion: `Se enviarán con tu próximo mensaje: ${imagenesPendientes.map((i) => i.nombre).join(", ")}`,
+							botones: [
+								{ id: "otra", etiqueta: "Agregar otra", tipo: "primario" },
+								{ id: "quitar", etiqueta: "Quitar todas", tipo: "peligro" },
+								{ id: "volver", etiqueta: "← Volver", tipo: "suave" },
+							],
+							grande: false,
+						});
+						if (que === "quitar") imagenesPendientes.length = 0;
+						if (que !== "otra") return;
+					}
+					const ruta = await elegirImagen(ui, { inicio: ctx.cwd, ventana: leerPreferencias().selectorGrafico });
+					if (!ruta) return;
+					const tipos: Record<string, string> = { ".png": "image/png", ".jpg": "image/jpeg", ".jpeg": "image/jpeg", ".gif": "image/gif", ".webp": "image/webp" };
+					const mimeType = tipos[extname(ruta).toLowerCase()];
+					if (!mimeType) return ctx.ui.notify("Ese archivo no es una imagen (.png, .jpg, .gif o .webp).", "warning");
+					if (statSync(ruta).size > 20 * 1024 * 1024) return ctx.ui.notify("La imagen es demasiado grande (máximo 20 MB).", "warning");
+					imagenesPendientes.push({ nombre: basename(ruta), imagen: { type: "image", data: readFileSync(ruta).toString("base64"), mimeType } });
+					if (!ctx.model?.input?.includes("image")) {
+						ctx.ui.notify(`Ojo: ${nombreModelo(ctx.model)} no puede ver imágenes. Cambia a un modelo que sí pueda (por ejemplo Claude, GPT o Gemini).`, "warning");
+					} else {
+						ctx.ui.notify("Imagen adjunta. Escribe tu pregunta y pulsa Enviar.", "info");
+					}
+				});
 			case "detener":
 				ctx.abort();
 				return;
@@ -616,9 +654,12 @@ export default function hilosenda(pi: ExtensionAPI) {
 		const lista: BotonLateral[] = [];
 		if (trabajando) lista.push({ id: "detener", icono: "■", etiqueta: "Detener", peligro: true });
 		lista.push(
-			{ id: "menu", icono: "≡", etiqueta: "Menú" },
-			{ id: "modelo", icono: "◆", etiqueta: nombreModelo(ctxActual?.model) },
+			{ id: "imagen", icono: "▣", etiqueta: imagenesPendientes.length ? `Imágenes (${imagenesPendientes.length})` : "Adjuntar imagen" },
+			{ id: "modelo", icono: "◆", etiqueta: "Cambiar modelo" },
+			{ id: "razonamiento", icono: "◑", etiqueta: "Razonamiento" },
+			{ id: "historial", icono: "❝", etiqueta: "Chats anteriores" },
 			{ id: "nuevo", icono: "✚", etiqueta: "Nuevo chat" },
+			{ id: "menu", icono: "≡", etiqueta: "Más opciones" },
 			{ id: "inicio", icono: "⌂", etiqueta: "Inicio" },
 		);
 		return lista;
@@ -893,6 +934,12 @@ export default function hilosenda(pi: ExtensionAPI) {
 				editor = new EditorHilosenda(tui, tema, teclas);
 				editor.estilo = estiloActual;
 				editor.botones = botonesLaterales;
+				editor.detalle = () => {
+					const partes = [`· ◆ ${nombreModelo(ctxActual?.model)}`];
+					if (imagenesPendientes.length) partes.push(`· ▣ ${imagenesPendientes.map((i) => i.nombre).join(", ")}`);
+					return partes.join(" ");
+				};
+				editor.hayAdjuntos = () => imagenesPendientes.length > 0;
 				editor.alPulsar = (id) => {
 					if (ctxActual) void ejecutarAccion(ctxActual, id);
 				};
@@ -928,9 +975,15 @@ export default function hilosenda(pi: ExtensionAPI) {
 		trabajando = false;
 		recordar(_e, ctx);
 	});
-	pi.on("input", (_e, ctx) => {
+	pi.on("input", (evento, ctx) => {
 		ctx.ui.setWidget("hilosenda-consejo", undefined);
 		filaSugerencias = undefined;
+		// Adjunta las imagenes elegidas con el boton al mensaje que se envia.
+		if (imagenesPendientes.length && !evento.text.trim().startsWith("/")) {
+			const imagenes = [...(evento.images ?? []), ...imagenesPendientes.map((i) => i.imagen)];
+			imagenesPendientes.length = 0;
+			return { action: "transform" as const, text: evento.text, images: imagenes };
+		}
 		return undefined;
 	});
 

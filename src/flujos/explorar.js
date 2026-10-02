@@ -11,6 +11,8 @@ import { elegirConVentana, selectorGraficoDisponible } from "../core/selector-si
 const EXTENSIONES_INSTRUCCIONES = new Set([".md", ".markdown", ".txt"]);
 
 export const esArchivoInstrucciones = (ruta) => EXTENSIONES_INSTRUCCIONES.has(extname(ruta).toLowerCase());
+const EXTENSIONES_IMAGEN = new Set([".png", ".jpg", ".jpeg", ".gif", ".webp"]);
+export const esImagen = (ruta) => EXTENSIONES_IMAGEN.has(extname(ruta).toLowerCase());
 
 const tamano = (bytes) => (bytes < 1024 ? `${bytes} B` : bytes < 1024 * 1024 ? `${Math.round(bytes / 1024)} KB` : `${(bytes / 1024 / 1024).toFixed(1)} MB`);
 
@@ -67,7 +69,7 @@ export async function explorar(ui, tipo, inicio, aviso) {
 				}
 				if (esCarpeta) {
 					elementos.push({ id: `d:${entrada.name}`, etiqueta: `▸ ${entrada.name}/`, grupo: "Carpetas", valor: { accion: "ir", ruta } });
-				} else if (tipo === "instrucciones" && esArchivoInstrucciones(entrada.name)) {
+				} else if ((tipo === "instrucciones" && esArchivoInstrucciones(entrada.name)) || (tipo === "imagen" && esImagen(entrada.name))) {
 					let detalle = "";
 					try {
 						detalle = tamano(statSync(ruta).size);
@@ -82,7 +84,7 @@ export async function explorar(ui, tipo, inicio, aviso) {
 		const extras = [{ id: "escribir", etiqueta: "Escribir una ruta" }];
 		if (tipo === "carpeta") extras.unshift({ id: "nueva", etiqueta: "+ Nueva carpeta aqui" });
 		const eleccion = await ui.elegir({
-			titulo: tipo === "carpeta" ? "Elige la carpeta de tu proyecto" : "Elige el archivo de instrucciones (.md o .txt)",
+			titulo: tipo === "carpeta" ? "Elige la carpeta de tu proyecto" : tipo === "imagen" ? "Elige una imagen" : "Elige el archivo de instrucciones (.md o .txt)",
 			explicacion: `${aviso ? `No se pudo abrir la ventana del sistema (${aviso}). Puedes elegir aqui mismo.\n` : ""}Estas en: ${actual}\n${tipo === "carpeta" ? "Haz clic en una carpeta para entrar y luego en «Usar esta carpeta»." : "Haz clic en una carpeta para entrar y luego en el archivo."}`,
 			elementos,
 			buscador: true,
@@ -110,7 +112,7 @@ export async function explorar(ui, tipo, inicio, aviso) {
 				continue;
 			}
 			if (statSync(completa).isDirectory()) actual = completa;
-			else if (tipo === "instrucciones") return completa;
+			else if (tipo !== "carpeta") return completa;
 			continue;
 		}
 		if (eleccion.accion === "usar") return actual;
@@ -149,6 +151,22 @@ export async function elegirInstrucciones(ui, opciones = {}) {
 		aviso = r.motivo;
 	}
 	return explorar(ui, "instrucciones", opciones.inicio, aviso);
+}
+
+/**
+ * Elige una imagen (.png, .jpg, .gif, .webp).
+ * @param {import("../ui/dialogos.js").Dialogos} ui
+ * @param {{ inicio?: string, ventana?: boolean }} [opciones]
+ */
+export async function elegirImagen(ui, opciones = {}) {
+	let aviso;
+	if (opciones.ventana !== false && selectorGraficoDisponible()) {
+		const r = await ui.esperar("Abriendo la ventana para elegir la imagen… (si no la ves, mira detras de esta ventana)", elegirConVentana("imagen", { inicio: opciones.inicio }));
+		if (r.estado === "ok") return r.ruta;
+		if (r.estado === "cancelado") return undefined;
+		aviso = r.motivo;
+	}
+	return explorar(ui, "imagen", opciones.inicio, aviso);
 }
 
 export const nombreCorto = (ruta) => basename(ruta) || ruta;

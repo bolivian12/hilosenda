@@ -10,7 +10,7 @@ const RUTA_PORTAL = "/org/freedesktop/portal/desktop";
 
 /**
  * Abre el selector del portal.
- * @param {"carpeta" | "instrucciones"} tipo
+ * @param {"carpeta" | "instrucciones" | "imagen"} tipo
  * @param {{ titulo: string, inicio?: string }} opciones
  * @returns {Promise<import("./selector-sistema.js").Resultado>}
  */
@@ -42,6 +42,9 @@ export async function elegirConPortal(tipo, { titulo, inicio }) {
 		];
 		if (tipo === "carpeta") {
 			opciones.push(["directory", variante("b", true)]);
+		} else if (tipo === "imagen") {
+			const patrones = ["*.png", "*.PNG", "*.jpg", "*.JPG", "*.jpeg", "*.gif", "*.webp"].map((p) => [0, p]);
+			opciones.push(["filters", variante("a(sa(us))", [["Imágenes", patrones], ["Todos los archivos", [[0, "*"]]]])]);
 		} else {
 			const patrones = ["*.md", "*.MD", "*.markdown", "*.txt", "*.TXT"].map((p) => [0, p]);
 			opciones.push(["filters", variante("a(sa(us))", [["Instrucciones (.md, .txt)", patrones], ["Todos los archivos", [[0, "*"]]]])]);
