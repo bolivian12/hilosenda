@@ -1,6 +1,6 @@
 # Instalador de hilosenda para Windows.
 #
-#   powershell -ExecutionPolicy Bypass -c "irm https://raw.githubusercontent.com/bolivian12/pruebarepositori/main/install/install.ps1 | iex"
+#   powershell -ExecutionPolicy Bypass -c "irm https://raw.githubusercontent.com/bolivian12/hilosenda/main/install/install.ps1 | iex"
 #
 # No necesita permisos de administrador. Si no tienes Node.js 22.19 o mas nuevo,
 # descarga una copia privada de Node.js solo para hilosenda. Crea accesos directos
@@ -13,7 +13,7 @@ $ProgressPreference = 'SilentlyContinue'
 try { [Net.ServicePointManager]::SecurityProtocol = [Net.ServicePointManager]::SecurityProtocol -bor [Net.SecurityProtocolType]::Tls12 } catch {}
 
 $Ref = if ($env:HILOSENDA_REF) { $env:HILOSENDA_REF } else { 'main' }
-$Repo = if ($env:HILOSENDA_REPO) { $env:HILOSENDA_REPO } else { 'bolivian12/pruebarepositori' }
+$Repo = if ($env:HILOSENDA_REPO) { $env:HILOSENDA_REPO } else { 'bolivian12/hilosenda' }
 $Dir = if ($env:HILOSENDA_DIR) { $env:HILOSENDA_DIR } else { Join-Path $env:LOCALAPPDATA 'hilosenda' }
 $NodeVersion = '22.22.0'
 
@@ -110,7 +110,8 @@ foreach ($destino in @([Environment]::GetFolderPath('Desktop'), (Join-Path ([Env
 	}
 	$acceso.WorkingDirectory = $env:USERPROFILE
 	$acceso.Description = 'Asistente de IA para tus proyectos'
-	$acceso.IconLocation = "$NodeExe,0"
+	$icono = Join-Path $carpetaApp 'node_modules\hilosenda\install\hilosenda.ico'
+	$acceso.IconLocation = if (Test-Path $icono) { "$icono,0" } else { "$NodeExe,0" }
 	$acceso.Save()
 }
 Ok 'Accesos directos en el Escritorio y en el menu Inicio'

@@ -1,14 +1,14 @@
 #!/bin/sh
 # Instalador de hilosenda para Linux y macOS.
 #
-#   curl -fsSL https://raw.githubusercontent.com/bolivian12/pruebarepositori/main/install/install.sh | sh
+#   curl -fsSL https://raw.githubusercontent.com/bolivian12/hilosenda/main/install/install.sh | sh
 #
 # No necesita permisos de administrador. Si no tienes Node.js 22.19 o mas nuevo,
 # descarga una copia privada de Node.js solo para hilosenda.
 #
 # Variables opcionales:
 #   HILOSENDA_REF   rama o etiqueta a instalar (por defecto: main)
-#   HILOSENDA_REPO  repositorio de GitHub (por defecto: bolivian12/pruebarepositori)
+#   HILOSENDA_REPO  repositorio de GitHub (por defecto: bolivian12/hilosenda)
 #   HILOSENDA_DIR   carpeta de instalacion (por defecto: ~/.hilosenda)
 #   HILOSENDA_FUENTE carpeta o archivo .tgz local en lugar de descargar de GitHub
 #
@@ -19,7 +19,7 @@
 set -eu
 
 REF="${HILOSENDA_REF:-main}"
-REPO="${HILOSENDA_REPO:-bolivian12/pruebarepositori}"
+REPO="${HILOSENDA_REPO:-bolivian12/hilosenda}"
 DIR="${HILOSENDA_DIR:-$HOME/.hilosenda}"
 NODE_VERSION="22.22.0"
 BIN_DIR="$HOME/.local/bin"
@@ -193,6 +193,7 @@ Type=Application
 Name=hilosenda
 Comment=Asistente de IA para tus proyectos
 Exec=$BIN_DIR/hilosenda
+Icon=$DIR/app/node_modules/hilosenda/install/hilosenda.png
 Terminal=true
 Categories=Development;Utility;
 EOF

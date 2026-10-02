@@ -1,0 +1,26 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" width="256" height="256">
+  <defs>
+    <linearGradient id="hilo" x1="0" y1="1" x2="1" y2="0">
+      <stop offset="0" stop-color="#3fd9b8"/>
+      <stop offset="0.5" stop-color="#5aa9f0"/>
+      <stop offset="1" stop-color="#a98bf5"/>
+    </linearGradient>
+    <linearGradient id="fondo" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#262a33"/>
+      <stop offset="1" stop-color="#16181d"/>
+    </linearGradient>
+  </defs>
+  <rect x="8" y="8" width="240" height="240" rx="56" fill="url(#fondo)"/>
+  <rect x="8.5" y="8.5" width="239" height="239" rx="55.5" fill="none" stroke="#ffffff" stroke-opacity="0.08"/>
+  <!-- la senda: un hilo que avanza de abajo hacia arriba -->
+  <path d="M52 196 C 96 196, 92 128, 128 128 S 160 60, 190 64"
+        fill="none" stroke="url(#hilo)" stroke-width="18" stroke-linecap="round"/>
+  <!-- puntadas -->
+  <g fill="#e8ecf4" fill-opacity="0.9">
+    <circle cx="52" cy="196" r="9"/>
+    <circle cx="128" cy="128" r="7"/>
+  </g>
+  <!-- el rombo de hilosenda -->
+  <path d="M196 34 L222 60 L196 86 L170 60 Z" fill="#a98bf5"/>
+  <path d="M196 46 L210 60 L196 74 L182 60 Z" fill="#ffffff" fill-opacity="0.35"/>
+</svg>
