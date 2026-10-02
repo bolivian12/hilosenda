@@ -5,6 +5,19 @@
 
 import { fuzzyFilter, Input, matchesKey, truncateToWidth, visibleWidth, wrapTextWithAnsi } from "@earendil-works/pi-tui";
 import { logoDegradado } from "./animacion.js";
+import { leerPortapapeles } from "../core/portapapeles.js";
+
+/** Ctrl+V (o Alt+V en Windows), el atajo de pegar. */
+const esAtajoPegar = (data) => matchesKey(data, "ctrl+v") || (process.platform === "win32" && matchesKey(data, "alt+v"));
+
+/** Lee texto del portapapeles (o la ruta si se copio un archivo). */
+async function textoDelPortapapeles() {
+	const c = await leerPortapapeles().catch(() => undefined);
+	if (!c) return "";
+	if (c.tipo === "texto") return c.texto;
+	if (c.tipo === "archivos") return c.rutas.join(" ");
+	return "";
+}
 
 const espacios = (n) => " ".repeat(Math.max(0, n));
 
@@ -652,7 +665,21 @@ export class Lista {
 			this.filtrar();
 			return true;
 		}
-		if (this.buscador && esImprimible(data) && !data.includes("\x1b[200~")) {
+		if (this.buscador && esAtajoPegar(data)) {
+			void textoDelPortapapeles().then((t) => {
+				if (!t) return;
+				this.consulta += t.replace(/\s+/g, " ").trim();
+				this.filtrar();
+				this.pantalla?.pedirRender();
+			});
+			return true;
+		}
+		if (this.buscador && data.includes("\x1b[200~")) {
+			this.consulta += data.replace(/\x1b\[20[01]~/g, "").replace(/\s+/g, " ").trim();
+			this.filtrar();
+			return true;
+		}
+		if (this.buscador && esImprimible(data)) {
 			this.consulta += data;
 			this.filtrar();
 			return true;
@@ -756,9 +783,24 @@ export class Campo {
 		];
 	}
 
+	/** Pega texto como si se hubiera pegado desde la terminal. */
+	pegarTexto(texto) {
+		if (!texto) return;
+		this.input.handleInput(`\x1b[200~${texto.replace(/\r?\n/g, " ").trim()}\x1b[201~`);
+		this.pantalla?.pedirRender();
+	}
+
+	pegarPortapapeles() {
+		void textoDelPortapapeles().then((t) => this.pegarTexto(t));
+	}
+
 	handleInput(data) {
 		if (matchesKey(data, "up") || matchesKey(data, "down") || matchesKey(data, "tab") || matchesKey(data, "escape")) {
 			return false;
+		}
+		if (esAtajoPegar(data)) {
+			this.pegarPortapapeles();
+			return true;
 		}
 		if (matchesKey(data, "enter")) {
 			this.alEnviar?.(this.valor);
@@ -769,6 +811,10 @@ export class Campo {
 	}
 
 	handleMouse(evento) {
+		if (evento.button === "right" && evento.type === "press") {
+			this.pegarPortapapeles();
+			return { handled: true };
+		}
 		if (evento.button === "left" && (evento.type === "press" || evento.type === "click")) return { handled: true };
 		return undefined;
 	}
@@ -809,6 +855,7 @@ export class Pantalla {
 	}
 
 	agregar(componente) {
+		componente.pantalla = this;
 		this.hijos.push(componente);
 		if (this.foco < 0 && componente.interactivo) this.enfocar(this.hijos.length - 1);
 		return componente;
@@ -912,6 +959,15 @@ export class Pantalla {
 
 	handleMouse(evento) {
 		const esMovimiento = evento.type === "move" || evento.type === "drag";
+
+		// Clic derecho en cualquier parte del dialogo: pegar en el campo de texto.
+		if (evento.button === "right" && evento.type === "press") {
+			const campo = this.hijos[this.foco]?.pegarPortapapeles ? this.hijos[this.foco] : this.hijos.find((h) => h.pegarPortapapeles);
+			if (campo) {
+				campo.pegarPortapapeles();
+				return { handled: true };
+			}
+		}
 
 		// Boton ✕ de la barra de titulo.
 		if (this.titulo && evento.y === 0 && this.zonaCerrar) {
