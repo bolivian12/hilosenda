@@ -1,3 +1,5 @@
+import { tr } from "../i18n.js";
+
 // Catalogo de servicios de IA que hilosenda sabe conectar.
 //
 // Hay tres clases:
@@ -23,45 +25,45 @@ export const PROVEEDORES = [
 	// --- En tu computadora ----------------------------------------------------
 	{
 		id: "ollama",
-		nombre: "Ollama",
+		nombre: tr("Ollama"),
 		clase: "local",
-		descripcion: "Modelos gratis en tu PC. El mas facil de instalar.",
+		descripcion: tr("Modelos gratis en tu PC. El mas facil de instalar."),
 		url: "http://localhost:11434/v1",
 		protocolo: "openai",
 		web: "https://ollama.com/download",
 	},
 	{
 		id: "lmstudio",
-		nombre: "LM Studio",
+		nombre: tr("LM Studio"),
 		clase: "local",
-		descripcion: "Aplicacion con ventana para descargar y servir modelos.",
+		descripcion: tr("Aplicacion con ventana para descargar y servir modelos."),
 		url: "http://localhost:1234/v1",
 		protocolo: "openai",
 		web: "https://lmstudio.ai",
 	},
 	{
 		id: "llamacpp",
-		nombre: "llama.cpp",
+		nombre: tr("llama.cpp"),
 		clase: "local",
-		descripcion: "Servidor llama-server con archivos GGUF.",
+		descripcion: tr("Servidor llama-server con archivos GGUF."),
 		url: "http://localhost:8080/v1",
 		protocolo: "openai",
 		web: "https://github.com/ggml-org/llama.cpp",
 	},
 	{
 		id: "vllm",
-		nombre: "vLLM",
+		nombre: tr("vLLM"),
 		clase: "local",
-		descripcion: "Servidor rapido para tarjetas graficas potentes.",
+		descripcion: tr("Servidor rapido para tarjetas graficas potentes."),
 		url: "http://localhost:8000/v1",
 		protocolo: "openai",
 		web: "https://docs.vllm.ai",
 	},
 	{
 		id: "jan",
-		nombre: "Jan",
+		nombre: tr("Jan"),
 		clase: "local",
-		descripcion: "Aplicacion de escritorio con servidor local.",
+		descripcion: tr("Aplicacion de escritorio con servidor local."),
 		url: "http://localhost:1337/v1",
 		protocolo: "openai",
 		web: "https://jan.ai",
@@ -70,9 +72,9 @@ export const PROVEEDORES = [
 	// --- En la nube, con clave API ---------------------------------------------
 	{
 		id: "anthropic",
-		nombre: "Anthropic (Claude)",
+		nombre: tr("Anthropic (Claude)"),
 		clase: "nube",
-		descripcion: "Modelos Claude. Muy buenos para programar.",
+		descripcion: tr("Modelos Claude. Muy buenos para programar."),
 		url: "https://api.anthropic.com",
 		protocolo: "anthropic",
 		web: "https://console.anthropic.com/settings/keys",
@@ -80,9 +82,9 @@ export const PROVEEDORES = [
 	},
 	{
 		id: "openai",
-		nombre: "OpenAI (GPT)",
+		nombre: tr("OpenAI (GPT)"),
 		clase: "nube",
-		descripcion: "Modelos GPT y o-series.",
+		descripcion: tr("Modelos GPT y o-series."),
 		url: "https://api.openai.com/v1",
 		protocolo: "openai",
 		web: "https://platform.openai.com/api-keys",
@@ -90,9 +92,9 @@ export const PROVEEDORES = [
 	},
 	{
 		id: "google",
-		nombre: "Google (Gemini)",
+		nombre: tr("Google (Gemini)"),
 		clase: "nube",
-		descripcion: "Modelos Gemini. Tiene un nivel gratuito.",
+		descripcion: tr("Modelos Gemini. Tiene un nivel gratuito."),
 		url: "https://generativelanguage.googleapis.com/v1beta",
 		protocolo: "google",
 		web: "https://aistudio.google.com/apikey",
@@ -100,9 +102,9 @@ export const PROVEEDORES = [
 	},
 	{
 		id: "openrouter",
-		nombre: "OpenRouter",
+		nombre: tr("OpenRouter"),
 		clase: "nube",
-		descripcion: "Una sola clave para cientos de modelos de muchas empresas.",
+		descripcion: tr("Una sola clave para cientos de modelos de muchas empresas."),
 		url: "https://openrouter.ai/api/v1",
 		protocolo: "openai",
 		web: "https://openrouter.ai/keys",
@@ -110,9 +112,9 @@ export const PROVEEDORES = [
 	},
 	{
 		id: "groq",
-		nombre: "Groq",
+		nombre: tr("Groq"),
 		clase: "nube",
-		descripcion: "Respuestas muy rapidas. Tiene nivel gratuito.",
+		descripcion: tr("Respuestas muy rapidas. Tiene nivel gratuito."),
 		url: "https://api.groq.com/openai/v1",
 		protocolo: "openai",
 		web: "https://console.groq.com/keys",
@@ -120,9 +122,9 @@ export const PROVEEDORES = [
 	},
 	{
 		id: "deepseek",
-		nombre: "DeepSeek",
+		nombre: tr("DeepSeek"),
 		clase: "nube",
-		descripcion: "Modelos economicos y capaces.",
+		descripcion: tr("Modelos economicos y capaces."),
 		url: "https://api.deepseek.com",
 		protocolo: "openai",
 		web: "https://platform.deepseek.com/api_keys",
@@ -130,9 +132,9 @@ export const PROVEEDORES = [
 	},
 	{
 		id: "mistral",
-		nombre: "Mistral",
+		nombre: tr("Mistral"),
 		clase: "nube",
-		descripcion: "Modelos europeos, incluido Codestral.",
+		descripcion: tr("Modelos europeos, incluido Codestral."),
 		url: "https://api.mistral.ai/v1",
 		protocolo: "openai",
 		web: "https://console.mistral.ai/api-keys",
@@ -140,9 +142,9 @@ export const PROVEEDORES = [
 	},
 	{
 		id: "xai",
-		nombre: "xAI (Grok)",
+		nombre: tr("xAI (Grok)"),
 		clase: "nube",
-		descripcion: "Modelos Grok.",
+		descripcion: tr("Modelos Grok."),
 		url: "https://api.x.ai/v1",
 		protocolo: "openai",
 		web: "https://console.x.ai",
@@ -150,9 +152,9 @@ export const PROVEEDORES = [
 	},
 	{
 		id: "cerebras",
-		nombre: "Cerebras",
+		nombre: tr("Cerebras"),
 		clase: "nube",
-		descripcion: "Muy rapido, con nivel gratuito.",
+		descripcion: tr("Muy rapido, con nivel gratuito."),
 		url: "https://api.cerebras.ai/v1",
 		protocolo: "openai",
 		web: "https://cloud.cerebras.ai",
@@ -160,9 +162,9 @@ export const PROVEEDORES = [
 	},
 	{
 		id: "together",
-		nombre: "Together AI",
+		nombre: tr("Together AI"),
 		clase: "nube",
-		descripcion: "Muchos modelos abiertos en la nube.",
+		descripcion: tr("Muchos modelos abiertos en la nube."),
 		url: "https://api.together.xyz/v1",
 		protocolo: "openai",
 		web: "https://api.together.ai/settings/api-keys",
@@ -170,9 +172,9 @@ export const PROVEEDORES = [
 	},
 	{
 		id: "fireworks",
-		nombre: "Fireworks",
+		nombre: tr("Fireworks"),
 		clase: "nube",
-		descripcion: "Modelos abiertos rapidos.",
+		descripcion: tr("Modelos abiertos rapidos."),
 		url: "https://api.fireworks.ai/inference/v1",
 		protocolo: "openai",
 		web: "https://fireworks.ai/account/api-keys",
@@ -180,9 +182,9 @@ export const PROVEEDORES = [
 	},
 	{
 		id: "moonshotai",
-		nombre: "Moonshot (Kimi)",
+		nombre: tr("Moonshot (Kimi)"),
 		clase: "nube",
-		descripcion: "Modelos Kimi.",
+		descripcion: tr("Modelos Kimi."),
 		url: "https://api.moonshot.ai/v1",
 		protocolo: "openai",
 		web: "https://platform.moonshot.ai",
@@ -190,9 +192,9 @@ export const PROVEEDORES = [
 	},
 	{
 		id: "nvidia",
-		nombre: "NVIDIA NIM",
+		nombre: tr("NVIDIA NIM"),
 		clase: "nube",
-		descripcion: "Modelos alojados por NVIDIA.",
+		descripcion: tr("Modelos alojados por NVIDIA."),
 		url: "https://integrate.api.nvidia.com/v1",
 		protocolo: "openai",
 		web: "https://build.nvidia.com",
@@ -202,16 +204,16 @@ export const PROVEEDORES = [
 	// --- Con tu cuenta (sin clave API) ------------------------------------------
 	{
 		id: "suscripcion",
-		nombre: "Mi suscripcion (Claude Pro/Max, ChatGPT, Copilot...)",
+		nombre: tr("Mi suscripcion (Claude Pro/Max, ChatGPT, Copilot...)"),
 		clase: "suscripcion",
-		descripcion: "Inicia sesion en el navegador con tu cuenta. Abre /login de Pi.",
+		descripcion: tr("Inicia sesion en el navegador con tu cuenta. Abre /login de Pi."),
 	},
 ];
 
 export const proveedorPorId = (id) => PROVEEDORES.find((p) => p.id === id);
 
 export const NOMBRES_CLASE = {
-	local: "En tu computadora (gratis y privado)",
-	nube: "En la nube (necesita una clave API)",
-	suscripcion: "Con tu cuenta",
+	local: tr("En tu computadora (gratis y privado)"),
+	nube: tr("En la nube (necesita una clave API)"),
+	suscripcion: tr("Con tu cuenta"),
 };

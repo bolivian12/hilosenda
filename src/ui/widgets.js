@@ -6,6 +6,7 @@
 import { fuzzyFilter, Input, matchesKey, truncateToWidth, visibleWidth, wrapTextWithAnsi } from "@earendil-works/pi-tui";
 import { logoDegradado } from "./animacion.js";
 import { leerPortapapeles } from "../core/portapapeles.js";
+import { tr } from "../i18n.js";
 
 /** Ctrl+V (o Alt+V en Windows), el atajo de pegar. */
 const esAtajoPegar = (data) => matchesKey(data, "ctrl+v") || (process.platform === "win32" && matchesKey(data, "alt+v"));
@@ -504,7 +505,7 @@ export class Lista {
 		this.estilo = estilo;
 		this.alto = opciones.alto ?? 10;
 		this.buscador = opciones.buscador ?? elementos.length > 8;
-		this.vacio = opciones.vacio ?? "No hay nada para mostrar.";
+		this.vacio = opciones.vacio ?? tr("No hay nada para mostrar.");
 		this.alElegir = opciones.alElegir;
 		this.alCambiar = opciones.alCambiar;
 		this.interactivo = true;
@@ -565,7 +566,7 @@ export class Lista {
 		if (this.buscador) {
 			const fondo = this.enfocado ? e.mezclar(e.c.tarjeta, e.c.acento, 0.12) : e.c.tarjeta;
 			const cursor = this.enfocado ? { t: "▏", fg: e.c.acento } : { t: "" };
-			const contenido = this.consulta ? [{ t: this.consulta, fg: e.c.texto }, cursor] : [cursor, { t: "escribe para buscar…", fg: e.c.tenue }];
+			const contenido = this.consulta ? [{ t: this.consulta, fg: e.c.texto }, cursor] : [cursor, { t: tr("escribe para buscar…"), fg: e.c.tenue }];
 			const interior = e.segmentos([{ t: " ⌕ ", fg: e.c.acento, negrita: true }, ...contenido], fondo);
 			const relleno = e.pintar(espacios(Math.max(0, ancho - 2 - visibleWidth(interior))), { bg: fondo });
 			lineas.push(e.pintar("▐", { fg: fondo }) + interior + relleno + e.pintar("▌", { fg: fondo }));
@@ -573,7 +574,7 @@ export class Lista {
 			this.zonas.push({ tipo: "buscador", y: 0 });
 		}
 		if (this.visibles.length === 0) {
-			lineas.push(e.suave(`  ${this.consulta ? "Nada coincide con la busqueda." : this.vacio}`));
+			lineas.push(e.suave(`  ${this.consulta ? tr("Nada coincide con la busqueda.") : this.vacio}`));
 			return lineas;
 		}
 
@@ -587,7 +588,7 @@ export class Lista {
 		const anchoEtiqueta = Math.min(Math.max(...this.visibles.map((x) => visibleWidth(x.etiqueta))) + 3, Math.max(12, Math.floor(ancho * 0.5)));
 
 		if (this.desplazamiento > 0) {
-			lineas.push(e.acento(`   ▲ ${this.desplazamiento} mas arriba`));
+			lineas.push(e.acento(tr("   ▲ {0} mas arriba", [this.desplazamiento])));
 			this.zonas.push({ tipo: "arriba", y: lineas.length - 1 });
 		}
 		for (const fila of filas.slice(this.desplazamiento, this.desplazamiento + alto)) {
@@ -615,7 +616,7 @@ export class Lista {
 		}
 		const debajo = filas.length - (this.desplazamiento + alto);
 		if (debajo > 0) {
-			lineas.push(e.acento(`   ▼ ${debajo} mas abajo`));
+			lineas.push(e.acento(tr("   ▼ {0} mas abajo", [debajo])));
 			this.zonas.push({ tipo: "abajo", y: lineas.length - 1 });
 		}
 		return lineas;
@@ -838,7 +839,7 @@ export class Pantalla {
 	constructor(estilo, opciones = {}) {
 		this.estilo = estilo;
 		this.titulo = opciones.titulo;
-		this.pie = opciones.pie ?? "Clic en un boton · Flechas y Enter · Esc para volver";
+		this.pie = opciones.pie ?? tr("Clic en un boton · Flechas y Enter · Esc para volver");
 		this.alSalir = opciones.alSalir;
 		this.alto = opciones.alto;
 		/** @type {any[]} */

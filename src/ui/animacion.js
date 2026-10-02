@@ -8,6 +8,7 @@
 // Cualquier tecla o clic la salta.
 
 import { visibleWidth } from "@earendil-works/pi-tui";
+import { tr } from "../i18n.js";
 
 export const LOGO_GRANDE = [
 	"╻ ╻ ╻ ╻   ┏━┓ ┏━┓ ┏━╸ ┏┓╻ ╺┳┓ ┏━┓",
@@ -15,7 +16,7 @@ export const LOGO_GRANDE = [
 	"╹ ╹ ╹ ┗━╸ ┗━┛ ┗━┛ ┗━╸ ╹ ╹ ╺┻┛ ╹ ╹",
 ];
 
-export const LEMA = "tu senda con la IA, hilo a hilo";
+export const LEMA = tr("tu senda con la IA, hilo a hilo");
 
 const sinColor = Boolean(process.env.NO_COLOR);
 
@@ -142,7 +143,7 @@ export class AnimacionInicio {
 		if (this.version && progresoLema >= 1) lineas.push(centrar(pintar([110, 115, 130], `v${this.version}`), ancho));
 
 		while (lineas.length < alto - 1) lineas.push("");
-		lineas.push(centrar(pintar([90, 95, 110], "pulsa cualquier tecla o haz clic para saltar"), ancho));
+		lineas.push(centrar(pintar([90, 95, 110], tr("pulsa cualquier tecla o haz clic para saltar")), ancho));
 		return lineas;
 	}
 

@@ -5,6 +5,7 @@
 // promesa con el valor con el que se cerro.
 
 import { Campo, FilaBotones, Lista, Pantalla, Parrafo, Tarjeta } from "./widgets.js";
+import { tr } from "../i18n.js";
 
 /**
  * @typedef {(construir: (cerrar: (valor: any) => void) => Pantalla) => Promise<any>} Mostrar
@@ -30,7 +31,7 @@ import { Campo, FilaBotones, Lista, Pantalla, Parrafo, Tarjeta } from "./widgets
 export function crearDialogos(estilo, mostrar, opciones = {}) {
 	const altoPantalla = opciones.altoPantalla;
 	const altoLista = opciones.altoLista ?? (() => Math.max(5, Math.min(16, (process.stdout.rows || 24) - 14)));
-	const VOLVER = { id: "__volver", etiqueta: "← Volver", tipo: "suave" };
+	const VOLVER = { id: "__volver", etiqueta: tr("← Volver"), tipo: "suave" };
 
 	return {
 		estilo,
@@ -41,7 +42,7 @@ export function crearDialogos(estilo, mostrar, opciones = {}) {
 					titulo,
 					alto: altoPantalla,
 					alSalir: () => cerrar(undefined),
-					pie: "Clic para elegir · rueda o flechas para moverte · escribe para buscar · Esc para volver",
+					pie: tr("Clic para elegir · rueda o flechas para moverte · escribe para buscar · Esc para volver"),
 				});
 				if (explicacion) pantalla.agregar(new Parrafo(estilo.suave(explicacion)));
 				pantalla.agregar(new Parrafo(""));
@@ -69,7 +70,7 @@ export function crearDialogos(estilo, mostrar, opciones = {}) {
 					titulo,
 					alto: altoPantalla,
 					alSalir: () => cerrar(undefined),
-					pie: "Escribe o pega (clic derecho o Ctrl+V) y pulsa Enter · Esc para volver",
+					pie: tr("Escribe o pega (clic derecho o Ctrl+V) y pulsa Enter · Esc para volver"),
 				});
 				if (explicacion) pantalla.agregar(new Parrafo(estilo.suave(explicacion)));
 				pantalla.agregar(new Parrafo(""));
@@ -88,8 +89,8 @@ export function crearDialogos(estilo, mostrar, opciones = {}) {
 					new FilaBotones(
 						estilo,
 						[
-							{ id: "aceptar", etiqueta: "Aceptar", tipo: "primario" },
-							{ id: "volver", etiqueta: "← Volver", tipo: "suave" },
+							{ id: "aceptar", etiqueta: tr("Aceptar"), tipo: "primario" },
+							{ id: "volver", etiqueta: tr("← Volver"), tipo: "suave" },
 						],
 						{ alPulsar: (id) => (id === "aceptar" ? enviar(campo.valor) : cerrar(undefined)) },
 					),
@@ -98,7 +99,7 @@ export function crearDialogos(estilo, mostrar, opciones = {}) {
 			});
 		},
 
-		confirmar({ titulo, explicacion, si = "Si", no = "No", peligro = false }) {
+		confirmar({ titulo, explicacion, si = tr("Si"), no = tr("No"), peligro = false }) {
 			return mostrar((cerrar) => {
 				const pantalla = new Pantalla(estilo, { titulo, alto: altoPantalla, alSalir: () => cerrar(false) });
 				if (explicacion) pantalla.agregar(new Parrafo(explicacion));
@@ -139,7 +140,7 @@ export function crearDialogos(estilo, mostrar, opciones = {}) {
 				},
 			);
 			return mostrar((cerrar) => {
-				const pantalla = new Pantalla(estilo, { pie: "" });
+				const pantalla = new Pantalla(estilo, { pie: tr("") });
 				const marcos = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"];
 				let paso = 0;
 				pantalla.agregar(new Parrafo(""));
@@ -159,7 +160,7 @@ export function crearDialogos(estilo, mostrar, opciones = {}) {
 			});
 		},
 
-		informar({ titulo, texto, boton = "Entendido" }) {
+		informar({ titulo, texto, boton = tr("Entendido") }) {
 			return mostrar((cerrar) => {
 				const pantalla = new Pantalla(estilo, { titulo, alto: altoPantalla, alSalir: () => cerrar(undefined) });
 				pantalla.agregar(new Parrafo(texto));

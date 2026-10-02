@@ -20,6 +20,7 @@ import { archivoPreferencias } from "./rutas.js";
  * @property {boolean} animacion Mostrar la animacion de inicio.
  * @property {"auto" | "oscuro" | "claro" | "pi"} tema Tema de colores del chat.
  * @property {boolean} bienvenidaVista
+ * @property {string} idioma "auto" o un codigo ("es", "en", ...).
  */
 
 /** @type {Preferencias} */
@@ -36,6 +37,7 @@ export const PREFERENCIAS_POR_DEFECTO = {
 	animacion: true,
 	tema: "auto",
 	bienvenidaVista: false,
+	idioma: "auto",
 };
 
 const MAX_RECIENTES = 15;

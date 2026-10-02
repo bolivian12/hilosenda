@@ -11,6 +11,8 @@ if (mayor < 22 || (mayor === 22 && menor < 19)) {
 	process.exit(1);
 }
 
+const { tr } = await import("../src/i18n.js");
+
 const AYUDA = `hilosenda: Pi renovado, facil de usar con el raton.
 
 Uso:
@@ -42,7 +44,7 @@ async function principal() {
 		return;
 	}
 	if (!process.stdin.isTTY || !process.stdout.isTTY) {
-		console.error("hilosenda debe ejecutarse en una consola (terminal) interactiva.");
+		console.error(tr("hilosenda debe ejecutarse en una consola (terminal) interactiva."));
 		process.exit(1);
 	}
 
@@ -51,7 +53,7 @@ async function principal() {
 	if (posicional) {
 		carpeta = resolve(posicional);
 		if (!existsSync(carpeta) || !statSync(carpeta).isDirectory()) {
-			console.error(`No existe la carpeta: ${carpeta}`);
+			console.error(tr("No existe la carpeta: {0}", [carpeta]));
 			process.exit(1);
 		}
 	}
@@ -68,7 +70,7 @@ async function principal() {
 	};
 	const errorFatal = (error) => {
 		restaurar();
-		console.error("hilosenda encontro un error inesperado:\n", error);
+		console.error(tr("hilosenda encontro un error inesperado:"), "\n", error);
 		process.exit(1);
 	};
 	process.on("uncaughtException", errorFatal);

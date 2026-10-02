@@ -4,6 +4,7 @@
 // servicio y que modelos ofrece. Funciona con servicios compatibles con OpenAI
 // (Ollama, LM Studio, OpenRouter, Groq...), con Anthropic y con Google Gemini.
 
+import { tr } from "../i18n.js";
 import { PROVEEDORES } from "./proveedores.js";
 
 /**
@@ -46,18 +47,18 @@ async function pedir(url, { headers = {}, tiempo = 8000 } = {}) {
 	} catch (error) {
 		const causa = error?.cause?.code ?? error?.name ?? "";
 		throw new ErrorDeteccion(
-			causa === "TimeoutError" ? `No respondio a tiempo: ${url}` : `No se pudo conectar con ${url}`,
+			causa === "TimeoutError" ? tr("No respondio a tiempo: {0}", [url]) : tr("No se pudo conectar con {0}", [url]),
 			"red",
 		);
 	}
 	if (respuesta.status === 401 || respuesta.status === 403) {
-		throw new ErrorDeteccion("La clave API no es valida o no tiene permiso.", "clave");
+		throw new ErrorDeteccion(tr("La clave API no es valida o no tiene permiso."), "clave");
 	}
-	if (!respuesta.ok) throw new ErrorDeteccion(`El servicio respondio con error ${respuesta.status}.`, "formato");
+	if (!respuesta.ok) throw new ErrorDeteccion(tr("El servicio respondio con error {0}.", [respuesta.status]), "formato");
 	try {
 		return await respuesta.json();
 	} catch {
-		throw new ErrorDeteccion("La respuesta no tiene el formato esperado.", "formato");
+		throw new ErrorDeteccion(tr("La respuesta no tiene el formato esperado."), "formato");
 	}
 }
 
@@ -66,7 +67,7 @@ const pareceEmbedding = (id) => /embed|rerank|whisper|tts|dall-e|moderation|text
 /** Convierte la lista de modelos de un servicio estilo OpenAI. */
 export function leerListaOpenAI(datos) {
 	const lista = Array.isArray(datos) ? datos : Array.isArray(datos?.data) ? datos.data : Array.isArray(datos?.models) ? datos.models : undefined;
-	if (!lista) throw new ErrorDeteccion("La respuesta no tiene una lista de modelos.", "formato");
+	if (!lista) throw new ErrorDeteccion(tr("La respuesta no tiene una lista de modelos."), "formato");
 	return lista
 		.map((m) => {
 			const id = typeof m === "string" ? m : (m.id ?? m.name ?? m.model);

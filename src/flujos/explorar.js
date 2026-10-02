@@ -7,6 +7,7 @@ import { existsSync, mkdirSync, readdirSync, statSync } from "node:fs";
 import { homedir } from "node:os";
 import { basename, dirname, extname, join, parse, resolve } from "node:path";
 import { elegirConVentana, selectorGraficoDisponible } from "../core/selector-sistema.js";
+import { tr } from "../i18n.js";
 
 const EXTENSIONES_INSTRUCCIONES = new Set([".md", ".markdown", ".txt"]);
 
@@ -44,18 +45,18 @@ export async function explorar(ui, tipo, inicio, aviso) {
 		const entradas = leerCarpeta(actual);
 		const elementos = [];
 		if (tipo === "carpeta") {
-			elementos.push({ id: "usar", etiqueta: "✔ Usar esta carpeta", detalle: actual, grupo: "Acciones", valor: { accion: "usar" } });
+			elementos.push({ id: "usar", etiqueta: tr("✔ Usar esta carpeta"), detalle: actual, grupo: tr("Acciones"), valor: { accion: "usar" } });
 		}
 		const padre = dirname(actual);
-		if (padre !== actual) elementos.push({ id: "subir", etiqueta: "⬆ Subir un nivel", detalle: padre, grupo: "Acciones", valor: { accion: "ir", ruta: padre } });
-		elementos.push({ id: "casa", etiqueta: "⌂ Mi carpeta personal", detalle: homedir(), grupo: "Acciones", valor: { accion: "ir", ruta: homedir() } });
+		if (padre !== actual) elementos.push({ id: "subir", etiqueta: tr("⬆ Subir un nivel"), detalle: padre, grupo: tr("Acciones"), valor: { accion: "ir", ruta: padre } });
+		elementos.push({ id: "casa", etiqueta: tr("⌂ Mi carpeta personal"), detalle: homedir(), grupo: tr("Acciones"), valor: { accion: "ir", ruta: homedir() } });
 		for (const unidad of unidadesWindows()) {
 			if (parse(actual).root.toUpperCase() !== unidad.toUpperCase()) {
-				elementos.push({ id: `unidad-${unidad}`, etiqueta: `▣ Unidad ${unidad}`, grupo: "Acciones", valor: { accion: "ir", ruta: unidad } });
+				elementos.push({ id: `unidad-${unidad}`, etiqueta: `▣ Unidad ${unidad}`, grupo: tr("Acciones"), valor: { accion: "ir", ruta: unidad } });
 			}
 		}
 		if (!entradas) {
-			elementos.push({ id: "sin-permiso", etiqueta: "(no se puede leer esta carpeta)", grupo: "Contenido", valor: { accion: "nada" } });
+			elementos.push({ id: "sin-permiso", etiqueta: tr("(no se puede leer esta carpeta)"), grupo: tr("Contenido"), valor: { accion: "nada" } });
 		} else {
 			for (const entrada of entradas) {
 				const ruta = join(actual, entrada.name);
@@ -68,7 +69,7 @@ export async function explorar(ui, tipo, inicio, aviso) {
 					}
 				}
 				if (esCarpeta) {
-					elementos.push({ id: `d:${entrada.name}`, etiqueta: `▸ ${entrada.name}/`, grupo: "Carpetas", valor: { accion: "ir", ruta } });
+					elementos.push({ id: `d:${entrada.name}`, etiqueta: `▸ ${entrada.name}/`, grupo: tr("Carpetas"), valor: { accion: "ir", ruta } });
 				} else if ((tipo === "instrucciones" && esArchivoInstrucciones(entrada.name)) || tipo === "imagen") {
 					let detalle = "";
 					try {
@@ -76,39 +77,39 @@ export async function explorar(ui, tipo, inicio, aviso) {
 					} catch {
 						// Sin tamano.
 					}
-					elementos.push({ id: `f:${entrada.name}`, etiqueta: `≡ ${entrada.name}`, detalle, grupo: "Archivos de instrucciones", valor: { accion: "archivo", ruta } });
+					elementos.push({ id: `f:${entrada.name}`, etiqueta: `≡ ${entrada.name}`, detalle, grupo: tr("Archivos de instrucciones"), valor: { accion: "archivo", ruta } });
 				}
 			}
 		}
 
-		const extras = [{ id: "escribir", etiqueta: "Escribir una ruta" }];
-		if (tipo === "carpeta") extras.unshift({ id: "nueva", etiqueta: "+ Nueva carpeta aqui" });
+		const extras = [{ id: "escribir", etiqueta: tr("Escribir una ruta") }];
+		if (tipo === "carpeta") extras.unshift({ id: "nueva", etiqueta: tr("+ Nueva carpeta aqui") });
 		const eleccion = await ui.elegir({
-			titulo: tipo === "carpeta" ? "Elige la carpeta de tu proyecto" : tipo === "imagen" ? "Elige una imagen" : "Elige el archivo de instrucciones (.md o .txt)",
-			explicacion: `${aviso ? `No se pudo abrir la ventana del sistema (${aviso}). Puedes elegir aqui mismo.\n` : ""}Estas en: ${actual}\n${tipo === "carpeta" ? "Haz clic en una carpeta para entrar y luego en «Usar esta carpeta»." : "Haz clic en una carpeta para entrar y luego en el archivo."}`,
+			titulo: tipo === "carpeta" ? tr("Elige la carpeta de tu proyecto") : tipo === "imagen" ? tr("Elige una imagen") : tr("Elige el archivo de instrucciones (.md o .txt)"),
+			explicacion: `${aviso ? `${tr("No se pudo abrir la ventana del sistema ({0}). Puedes elegir aqui mismo.", [aviso])}\n` : ""}${tr("Estas en: {0}", [actual])}\n${tipo === "carpeta" ? tr("Haz clic en una carpeta para entrar y luego en «Usar esta carpeta».") : tr("Haz clic en una carpeta para entrar y luego en el archivo.")}`,
 			elementos,
 			buscador: true,
 			extras,
 		});
 		if (eleccion === undefined) return undefined;
 		if (eleccion.boton === "nueva") {
-			const nombre = await ui.preguntar({ titulo: "Nueva carpeta", etiqueta: "Nombre de la carpeta:", validar: (v) => (v && !/[\\/:*?"<>|]/.test(v) ? undefined : "Escribe un nombre sin \\ / : * ? \" < > |") });
+			const nombre = await ui.preguntar({ titulo: tr("Nueva carpeta"), etiqueta: tr("Nombre de la carpeta:"), validar: (v) => (v && !/[\\/:*?"<>|]/.test(v) ? undefined : tr("Escribe un nombre sin \\ / : * ? \" < > |")) });
 			if (nombre) {
 				try {
 					mkdirSync(join(actual, nombre), { recursive: true });
 					actual = join(actual, nombre);
 				} catch (error) {
-					await ui.informar({ titulo: "No se pudo crear la carpeta", texto: String(error?.message ?? error) });
+					await ui.informar({ titulo: tr("No se pudo crear la carpeta"), texto: String(error?.message ?? error) });
 				}
 			}
 			continue;
 		}
 		if (eleccion.boton === "escribir") {
-			const ruta = await ui.preguntar({ titulo: "Escribir una ruta", etiqueta: "Ruta:", valor: actual });
+			const ruta = await ui.preguntar({ titulo: tr("Escribir una ruta"), etiqueta: tr("Ruta:"), valor: actual });
 			if (!ruta) continue;
 			const completa = resolve(actual, ruta.replace(/^~(?=$|[\\/])/, homedir()));
 			if (!existsSync(completa)) {
-				await ui.informar({ titulo: "No existe", texto: `No se encontro: ${completa}` });
+				await ui.informar({ titulo: tr("No existe"), texto: tr("No se encontro: {0}", [completa]) });
 				continue;
 			}
 			if (statSync(completa).isDirectory()) actual = completa;
@@ -129,7 +130,7 @@ export async function explorar(ui, tipo, inicio, aviso) {
 export async function elegirCarpeta(ui, opciones = {}) {
 	let aviso;
 	if (opciones.ventana !== false && selectorGraficoDisponible()) {
-		const r = await ui.esperar("Abriendo la ventana para elegir la carpeta… (si no la ves, mira detras de esta ventana)", elegirConVentana("carpeta", { inicio: opciones.inicio }));
+		const r = await ui.esperar(tr("Abriendo la ventana para elegir la carpeta… (si no la ves, mira detras de esta ventana)"), elegirConVentana("carpeta", { inicio: opciones.inicio }));
 		if (r.estado === "ok") return r.ruta;
 		if (r.estado === "cancelado") return undefined;
 		aviso = r.motivo;
@@ -145,7 +146,7 @@ export async function elegirCarpeta(ui, opciones = {}) {
 export async function elegirInstrucciones(ui, opciones = {}) {
 	let aviso;
 	if (opciones.ventana !== false && selectorGraficoDisponible()) {
-		const r = await ui.esperar("Abriendo la ventana para elegir el archivo… (si no la ves, mira detras de esta ventana)", elegirConVentana("instrucciones", { inicio: opciones.inicio }));
+		const r = await ui.esperar(tr("Abriendo la ventana para elegir el archivo… (si no la ves, mira detras de esta ventana)"), elegirConVentana("instrucciones", { inicio: opciones.inicio }));
 		if (r.estado === "ok") return r.ruta;
 		if (r.estado === "cancelado") return undefined;
 		aviso = r.motivo;
@@ -161,7 +162,7 @@ export async function elegirInstrucciones(ui, opciones = {}) {
 export async function elegirImagen(ui, opciones = {}) {
 	let aviso;
 	if (opciones.ventana !== false && selectorGraficoDisponible()) {
-		const r = await ui.esperar("Abriendo la ventana para elegir la imagen… (si no la ves, mira detras de esta ventana)", elegirConVentana("imagen", { inicio: opciones.inicio }));
+		const r = await ui.esperar(tr("Abriendo la ventana para elegir la imagen… (si no la ves, mira detras de esta ventana)"), elegirConVentana("imagen", { inicio: opciones.inicio }));
 		if (r.estado === "ok") return r.ruta;
 		if (r.estado === "cancelado") return undefined;
 		aviso = r.motivo;

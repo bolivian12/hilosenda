@@ -9,6 +9,7 @@
 import { aModelosPi, buscarServidoresLocales, describirModelo, detectarModelos, normalizarUrl } from "../core/deteccion.js";
 import { agregarModelosAProveedor, guardarClave, guardarProveedor, leerModelosJson } from "../core/pi-config.js";
 import { NOMBRES_CLASE, PROVEEDORES, proveedorPorId } from "../core/proveedores.js";
+import { tr } from "../i18n.js";
 
 /**
  * @typedef {{ proveedor: string, modelo: string } | { accion: "login" } | undefined} ResultadoConexion
@@ -18,7 +19,7 @@ import { NOMBRES_CLASE, PROVEEDORES, proveedorPorId } from "../core/proveedores.
  * @property {boolean} [buscarLocales] Buscar servidores locales antes de mostrar la lista.
  */
 
-/** Convierte un texto en un identificador valido: "Mi Servidor!" → "mi-servidor". */
+/** Convierte un texto en un identificador valido: tr("Mi Servidor!") → "mi-servidor". */
 export function aIdentificador(texto) {
 	const id = texto
 		.normalize("NFD")
@@ -29,9 +30,9 @@ export function aIdentificador(texto) {
 	return id || "personalizado";
 }
 
-/** Texto con los datos de un modelo de Pi: "200K · razona · ve imagenes". */
+/** Texto con los datos de un modelo de Pi: tr("200K · razona · ve imagenes"). */
 function detallePi(m) {
-	return [m.contexto && `${m.contexto} de contexto`, m.razona && "razona", m.imagenes && "ve imagenes"].filter(Boolean).join(" · ");
+	return [m.contexto && tr("{0} de contexto", [m.contexto]), m.razona && "razona", m.imagenes && tr("ve imagenes")].filter(Boolean).join(" · ");
 }
 
 /**
@@ -42,8 +43,8 @@ async function elegirModelo(ui, nombreProveedor, elementos) {
 	if (elementos.length === 0) return undefined;
 	if (elementos.length === 1) return elementos[0].valor;
 	return ui.elegir({
-		titulo: `¿Que modelo de ${nombreProveedor} quieres usar?`,
-		explicacion: "Todos quedan guardados; podras cambiar de modelo cuando quieras con el boton «Modelo».",
+		titulo: tr("¿Que modelo de {0} quieres usar?", [nombreProveedor]),
+		explicacion: tr("Todos quedan guardados; podras cambiar de modelo cuando quieras con el boton «Modelo»."),
 		elementos,
 		buscador: elementos.length > 8,
 	});
@@ -56,11 +57,11 @@ async function elegirModelo(ui, nombreProveedor, elementos) {
  */
 async function detectarConAyuda(ui, opciones, nombre, ayudaInstalacion) {
 	try {
-		const deteccion = await ui.esperar(`Conectando con ${nombre} y buscando modelos…`, detectarModelos(opciones));
+		const deteccion = await ui.esperar(tr("Conectando con {0} y buscando modelos…", [nombre]), detectarModelos(opciones));
 		if (deteccion.modelos.length === 0) {
 			await ui.informar({
-				titulo: `${nombre} no tiene modelos`,
-				texto: `${nombre} respondio, pero no tiene ningun modelo de chat disponible.${ayudaInstalacion ? `\n\n${ayudaInstalacion}` : ""}`,
+				titulo: tr("{0} no tiene modelos", [nombre]),
+				texto: `${tr("{0} respondio, pero no tiene ningun modelo de chat disponible.", [nombre])}${ayudaInstalacion ? `\n\n${ayudaInstalacion}` : ""}`,
 			});
 			return undefined;
 		}
@@ -69,11 +70,11 @@ async function detectarConAyuda(ui, opciones, nombre, ayudaInstalacion) {
 		const motivo = error instanceof Error ? error.message : String(error);
 		const extra = error?.tipo === "red" && ayudaInstalacion ? `\n\n${ayudaInstalacion}` : "";
 		const eleccion = await ui.botones({
-			titulo: "No se pudo conectar",
+			titulo: tr("No se pudo conectar"),
 			explicacion: `${motivo}${extra}`,
 			botones: [
-				{ id: "reintentar", etiqueta: "Intentar de nuevo", tipo: "primario" },
-				{ id: "volver", etiqueta: "← Volver", tipo: "suave" },
+				{ id: "reintentar", etiqueta: tr("Intentar de nuevo"), tipo: "primario" },
+				{ id: "volver", etiqueta: tr("← Volver"), tipo: "suave" },
 			],
 			grande: false,
 		});
@@ -84,22 +85,22 @@ async function detectarConAyuda(ui, opciones, nombre, ayudaInstalacion) {
 /** Conecta un programa local (Ollama, LM Studio...). */
 async function conectarLocal(ui, proveedor) {
 	let url = proveedor.url;
-	const ayuda = `Si todavia no tienes ${proveedor.nombre}, descargalo de ${proveedor.web}, abrelo y vuelve a intentar.`;
+	const ayuda = tr("Si todavia no tienes {0}, descargalo de {1}, abrelo y vuelve a intentar.", [proveedor.nombre, proveedor.web]);
 	while (true) {
 		const deteccion = await detectarConAyuda(ui, { url, protocolo: "openai" }, proveedor.nombre, ayuda);
 		if (deteccion === "reintentar") {
 			const otra = await ui.botones({
-				titulo: `¿${proveedor.nombre} usa otra direccion?`,
-				explicacion: `Se intento con ${url}. Si cambiaste el puerto o esta en otra computadora, escribe la direccion.`,
+				titulo: tr("¿{0} usa otra direccion?", [proveedor.nombre]),
+				explicacion: tr("Se intento con {0}. Si cambiaste el puerto o esta en otra computadora, escribe la direccion.", [url]),
 				botones: [
-					{ id: "igual", etiqueta: "Reintentar con la misma", tipo: "primario" },
-					{ id: "otra", etiqueta: "Escribir otra direccion" },
-					{ id: "volver", etiqueta: "← Volver", tipo: "suave" },
+					{ id: "igual", etiqueta: tr("Reintentar con la misma"), tipo: "primario" },
+					{ id: "otra", etiqueta: tr("Escribir otra direccion") },
+					{ id: "volver", etiqueta: tr("← Volver"), tipo: "suave" },
 				],
 				grande: false,
 			});
 			if (otra === "otra") {
-				const nueva = await ui.preguntar({ titulo: "Direccion del servidor", etiqueta: "URL:", valor: url });
+				const nueva = await ui.preguntar({ titulo: tr("Direccion del servidor"), etiqueta: tr("URL:"), valor: url });
 				if (nueva) url = normalizarUrl(nueva);
 			} else if (otra !== "igual") return undefined;
 			continue;
@@ -126,11 +127,11 @@ async function conectarNube(ui, proveedor, catalogoPi) {
 	while (true) {
 		const clave = await ui.preguntar({
 			titulo: `Conectar ${proveedor.nombre}`,
-			explicacion: `1. Entra a ${proveedor.web}\n2. Crea una clave API y copiala.\n3. Pegala aqui abajo (se guarda solo en tu computadora).`,
-			etiqueta: "Clave API:",
-			placeholder: "pega aqui tu clave",
+			explicacion: tr("1. Entra a {0}\n2. Crea una clave API y copiala.\n3. Pegala aqui abajo (se guarda solo en tu computadora).", [proveedor.web]),
+			etiqueta: tr("Clave API:"),
+			placeholder: tr("pega aqui tu clave"),
 			oculto: true,
-			validar: (v) => (v ? undefined : "Pega la clave para continuar."),
+			validar: (v) => (v ? undefined : tr("Pega la clave para continuar.")),
 		});
 		if (!clave) return undefined;
 		const deteccion = await detectarConAyuda(ui, { url: proveedor.url, clave, protocolo: proveedor.protocolo }, proveedor.nombre);
@@ -152,8 +153,8 @@ async function conectarNube(ui, proveedor, catalogoPi) {
 		const elementos = [
 			...conocidos
 				.filter((m) => disponibles.size === 0 || disponibles.has(m.id))
-				.map((m) => ({ id: m.id, etiqueta: m.id, detalle: detallePi(m), grupo: "Recomendados (Pi los conoce bien)", valor: { proveedor: proveedor.id, modelo: m.id } })),
-			...nuevos.map((m) => ({ id: m.id, etiqueta: m.id, detalle: describirModelo(m), grupo: "Otros modelos de tu cuenta", valor: { proveedor: proveedor.id, modelo: m.id } })),
+				.map((m) => ({ id: m.id, etiqueta: m.id, detalle: detallePi(m), grupo: tr("Recomendados (Pi los conoce bien)"), valor: { proveedor: proveedor.id, modelo: m.id } })),
+			...nuevos.map((m) => ({ id: m.id, etiqueta: m.id, detalle: describirModelo(m), grupo: tr("Otros modelos de tu cuenta"), valor: { proveedor: proveedor.id, modelo: m.id } })),
 		];
 		return elegirModelo(ui, proveedor.nombre, elementos);
 	}
@@ -162,19 +163,19 @@ async function conectarNube(ui, proveedor, catalogoPi) {
 /** Conecta cualquier servicio escribiendo su direccion. */
 async function conectarPersonalizado(ui, urlInicial) {
 	const url = urlInicial ?? (await ui.preguntar({
-		titulo: "Conectar otro servicio",
+		titulo: tr("Conectar otro servicio"),
 		explicacion:
-			"Escribe la direccion del servicio. Sirve cualquiera compatible con OpenAI, Anthropic o Google.\nEjemplos: localhost:11434   ·   https://api.ejemplo.com/v1",
-		etiqueta: "Direccion (URL):",
-		placeholder: "https://…",
-		validar: (v) => (v ? undefined : "Escribe una direccion."),
+			tr("Escribe la direccion del servicio. Sirve cualquiera compatible con OpenAI, Anthropic o Google.\nEjemplos: localhost:11434   ·   https://api.ejemplo.com/v1"),
+		etiqueta: tr("Direccion (URL):"),
+		placeholder: tr("https://…"),
+		validar: (v) => (v ? undefined : tr("Escribe una direccion.")),
 	}));
 	if (!url) return undefined;
 	const clave = await ui.preguntar({
-		titulo: "Clave API (opcional)",
-		explicacion: "Si el servicio pide una clave, pegala aqui. Si no, deja el campo vacio y pulsa Aceptar.",
-		etiqueta: "Clave API:",
-		placeholder: "vacio si no hace falta",
+		titulo: tr("Clave API (opcional)"),
+		explicacion: tr("Si el servicio pide una clave, pegala aqui. Si no, deja el campo vacio y pulsa Aceptar."),
+		etiqueta: tr("Clave API:"),
+		placeholder: tr("vacio si no hace falta"),
 		oculto: true,
 	});
 	if (clave === undefined) return undefined;
@@ -189,11 +190,11 @@ async function conectarPersonalizado(ui, urlInicial) {
 		// Mantener el nombre sugerido por defecto.
 	}
 	const nombre = await ui.preguntar({
-		titulo: "Ponle un nombre",
-		explicacion: `Se encontraron ${deteccion.modelos.length} modelos. ¿Como quieres llamar a este servicio?`,
-		etiqueta: "Nombre:",
+		titulo: tr("Ponle un nombre"),
+		explicacion: tr("Se encontraron {0} modelos. ¿Como quieres llamar a este servicio?", [deteccion.modelos.length]),
+		etiqueta: tr("Nombre:"),
 		valor: sugerido,
-		validar: (v) => (v ? undefined : "Escribe un nombre."),
+		validar: (v) => (v ? undefined : tr("Escribe un nombre.")),
 	});
 	if (!nombre) return undefined;
 	// Nunca pisar un servicio que Pi ya trae ni otro que ya este guardado.
@@ -222,7 +223,7 @@ async function conectarPersonalizado(ui, urlInicial) {
  * @returns {Promise<ResultadoConexion>}
  */
 export async function conectarIA(ui, opciones) {
-	const encontrados = opciones.buscarLocales === false ? [] : await ui.esperar("Buscando IA instalada en tu computadora…", buscarServidoresLocales());
+	const encontrados = opciones.buscarLocales === false ? [] : await ui.esperar(tr("Buscando IA instalada en tu computadora…"), buscarServidoresLocales());
 	const funcionando = new Map(encontrados.map((e) => [e.proveedor.id, e.deteccion.modelos.length]));
 
 	const elementos = PROVEEDORES.map((p) => {
@@ -230,27 +231,27 @@ export async function conectarIA(ui, opciones) {
 		return {
 			id: p.id,
 			etiqueta: activos ? `${p.nombre}  ✓ funcionando` : p.nombre,
-			detalle: activos ? `${activos} modelos listos · ${p.descripcion}` : p.descripcion,
+			detalle: activos ? tr("{0} modelos listos · {1}", [activos, p.descripcion]) : p.descripcion,
 			grupo: NOMBRES_CLASE[p.clase],
 			valor: p.id,
 		};
 	});
 	elementos.push({
 		id: "personalizado",
-		etiqueta: "Otro servicio (escribir direccion)",
-		detalle: "Cualquier servidor compatible con OpenAI, Anthropic o Google",
-		grupo: "Otro",
+		etiqueta: tr("Otro servicio (escribir direccion)"),
+		detalle: tr("Cualquier servidor compatible con OpenAI, Anthropic o Google"),
+		grupo: tr("Otro"),
 		valor: "personalizado",
 	});
 	// Lo que ya funciona va primero.
 	elementos.sort((a, b) => Number(funcionando.has(b.id)) - Number(funcionando.has(a.id)));
-	if (funcionando.size > 0) for (const e of elementos) if (funcionando.has(e.id)) e.grupo = "Detectado en tu computadora";
+	if (funcionando.size > 0) for (const e of elementos) if (funcionando.has(e.id)) e.grupo = tr("Detectado en tu computadora");
 
 	while (true) {
 		const eleccion = await ui.elegir({
-			titulo: "Conectar una IA",
+			titulo: tr("Conectar una IA"),
 			explicacion:
-				"Elige donde esta la IA que quieres usar. Si no sabes cual elegir: Ollama es gratis y funciona sin internet; Anthropic, OpenAI o Google dan los mejores resultados.",
+				tr("Elige donde esta la IA que quieres usar. Si no sabes cual elegir: Ollama es gratis y funciona sin internet; Anthropic, OpenAI o Google dan los mejores resultados."),
 			elementos,
 			buscador: true,
 		});

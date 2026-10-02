@@ -26,6 +26,9 @@ import { logoDegradado } from "../src/ui/animacion.js";
 import { crearDialogos } from "../src/ui/dialogos.js";
 import { crearEstilo } from "../src/ui/style.js";
 import { FilaBotones, Mosaico, recortar } from "../src/ui/widgets.js";
+import { idioma, localeFechas, tr } from "../src/i18n.js";
+
+const NOMBRE_IDIOMA_EN: Record<string, string> = { es: "Spanish", pt: "Portuguese", fr: "French", de: "German", it: "Italian" };
 
 type Dialogos = ReturnType<typeof crearDialogos>;
 type Estilo = ReturnType<typeof crearEstilo>;
@@ -39,30 +42,30 @@ const COMANDOS_HILOSENDA = ["menu", "modelo", "razonamiento", "carpeta", "permis
 
 /** Explicacion en español de cada comando de Pi, agrupados para el menu. */
 const COMANDOS_PI: Array<{ nombre: string; etiqueta: string; detalle: string; grupo: string }> = [
-	{ nombre: "new", etiqueta: "Nuevo chat", detalle: "Empieza una conversacion desde cero", grupo: "Conversacion" },
-	{ nombre: "resume", etiqueta: "Continuar otra conversacion (Pi)", detalle: "Selector de sesiones original de Pi", grupo: "Conversacion" },
-	{ nombre: "tree", etiqueta: "Volver a un punto anterior", detalle: "Navega por el arbol de la conversacion y cambia de rama", grupo: "Conversacion" },
-	{ nombre: "fork", etiqueta: "Bifurcar desde un mensaje", detalle: "Crea una copia de la conversacion desde un mensaje anterior", grupo: "Conversacion" },
-	{ nombre: "clone", etiqueta: "Duplicar conversacion", detalle: "Copia la conversacion tal como esta ahora", grupo: "Conversacion" },
-	{ nombre: "name", etiqueta: "Ponerle nombre al chat", detalle: "Asi lo encuentras facil en el historial", grupo: "Conversacion" },
-	{ nombre: "compact", etiqueta: "Resumir para ahorrar memoria", detalle: "Resume lo anterior cuando la conversacion es muy larga", grupo: "Conversacion" },
-	{ nombre: "copy", etiqueta: "Copiar ultima respuesta", detalle: "Copia al portapapeles lo ultimo que dijo la IA", grupo: "Conversacion" },
-	{ nombre: "session", etiqueta: "Informacion del chat", detalle: "Mensajes, tokens usados y costo", grupo: "Conversacion" },
-	{ nombre: "export", etiqueta: "Exportar a HTML", detalle: "Guarda la conversacion como pagina web", grupo: "Conversacion" },
-	{ nombre: "import", etiqueta: "Importar conversacion", detalle: "Abre una conversacion desde un archivo .jsonl", grupo: "Conversacion" },
-	{ nombre: "share", etiqueta: "Compartir (gist de GitHub)", detalle: "Crea un enlace secreto para compartir", grupo: "Conversacion" },
-	{ nombre: "model", etiqueta: "Selector de modelos de Pi", detalle: "El selector original (Ctrl+S guarda como predeterminado)", grupo: "Modelo e IA" },
-	{ nombre: "thinking", etiqueta: "Selector de razonamiento de Pi", detalle: "El selector original de nivel de razonamiento", grupo: "Modelo e IA" },
-	{ nombre: "scoped-models", etiqueta: "Modelos para Ctrl+P", detalle: "Elige que modelos rotan con Ctrl+P", grupo: "Modelo e IA" },
-	{ nombre: "login", etiqueta: "Iniciar sesion (suscripcion o clave)", detalle: "Claude Pro/Max, ChatGPT, Copilot y mas", grupo: "Modelo e IA" },
-	{ nombre: "logout", etiqueta: "Cerrar sesion de un proveedor", detalle: "Borra la credencial guardada", grupo: "Modelo e IA" },
-	{ nombre: "trust", etiqueta: "Confiar en esta carpeta", detalle: "Guarda si confias en la configuracion del proyecto", grupo: "Proyecto" },
-	{ nombre: "reload", etiqueta: "Recargar", detalle: "Recarga extensiones, habilidades, temas y atajos", grupo: "Proyecto" },
-	{ nombre: "settings", etiqueta: "Ajustes avanzados de Pi", detalle: "Todos los ajustes originales de Pi", grupo: "Ajustes" },
-	{ nombre: "hotkeys", etiqueta: "Atajos de teclado", detalle: "Lista de todas las teclas rapidas", grupo: "Ayuda" },
-	{ nombre: "changelog", etiqueta: "Novedades de Pi", detalle: "Cambios de la ultima version", grupo: "Ayuda" },
-	{ nombre: "bug", etiqueta: "Reportar un error a Pi", detalle: "Envia un reporte a los desarrolladores de Pi", grupo: "Ayuda" },
-	{ nombre: "quit", etiqueta: "Salir del chat", detalle: "Cierra el chat (la conversacion queda guardada)", grupo: "Ayuda" },
+	{ nombre: tr("new"), etiqueta: tr("Nuevo chat"), detalle: tr("Empieza una conversacion desde cero"), grupo: tr("Conversacion") },
+	{ nombre: tr("resume"), etiqueta: tr("Continuar otra conversacion (Pi)"), detalle: tr("Selector de sesiones original de Pi"), grupo: tr("Conversacion") },
+	{ nombre: tr("tree"), etiqueta: tr("Volver a un punto anterior"), detalle: tr("Navega por el arbol de la conversacion y cambia de rama"), grupo: tr("Conversacion") },
+	{ nombre: tr("fork"), etiqueta: tr("Bifurcar desde un mensaje"), detalle: tr("Crea una copia de la conversacion desde un mensaje anterior"), grupo: tr("Conversacion") },
+	{ nombre: tr("clone"), etiqueta: tr("Duplicar conversacion"), detalle: tr("Copia la conversacion tal como esta ahora"), grupo: tr("Conversacion") },
+	{ nombre: tr("name"), etiqueta: tr("Ponerle nombre al chat"), detalle: tr("Asi lo encuentras facil en el historial"), grupo: tr("Conversacion") },
+	{ nombre: tr("compact"), etiqueta: tr("Resumir para ahorrar memoria"), detalle: tr("Resume lo anterior cuando la conversacion es muy larga"), grupo: tr("Conversacion") },
+	{ nombre: tr("copy"), etiqueta: tr("Copiar ultima respuesta"), detalle: tr("Copia al portapapeles lo ultimo que dijo la IA"), grupo: tr("Conversacion") },
+	{ nombre: tr("session"), etiqueta: tr("Informacion del chat"), detalle: tr("Mensajes, tokens usados y costo"), grupo: tr("Conversacion") },
+	{ nombre: tr("export"), etiqueta: tr("Exportar a HTML"), detalle: tr("Guarda la conversacion como pagina web"), grupo: tr("Conversacion") },
+	{ nombre: tr("import"), etiqueta: tr("Importar conversacion"), detalle: tr("Abre una conversacion desde un archivo .jsonl"), grupo: tr("Conversacion") },
+	{ nombre: tr("share"), etiqueta: tr("Compartir (gist de GitHub)"), detalle: tr("Crea un enlace secreto para compartir"), grupo: tr("Conversacion") },
+	{ nombre: tr("model"), etiqueta: tr("Selector de modelos de Pi"), detalle: tr("El selector original (Ctrl+S guarda como predeterminado)"), grupo: tr("Modelo e IA") },
+	{ nombre: tr("thinking"), etiqueta: tr("Selector de razonamiento de Pi"), detalle: tr("El selector original de nivel de razonamiento"), grupo: tr("Modelo e IA") },
+	{ nombre: tr("scoped-models"), etiqueta: tr("Modelos para Ctrl+P"), detalle: tr("Elige que modelos rotan con Ctrl+P"), grupo: tr("Modelo e IA") },
+	{ nombre: tr("login"), etiqueta: tr("Iniciar sesion (suscripcion o clave)"), detalle: tr("Claude Pro/Max, ChatGPT, Copilot y mas"), grupo: tr("Modelo e IA") },
+	{ nombre: tr("logout"), etiqueta: tr("Cerrar sesion de un proveedor"), detalle: tr("Borra la credencial guardada"), grupo: tr("Modelo e IA") },
+	{ nombre: tr("trust"), etiqueta: tr("Confiar en esta carpeta"), detalle: tr("Guarda si confias en la configuracion del proyecto"), grupo: tr("Proyecto") },
+	{ nombre: tr("reload"), etiqueta: tr("Recargar"), detalle: tr("Recarga extensiones, habilidades, temas y atajos"), grupo: tr("Proyecto") },
+	{ nombre: tr("settings"), etiqueta: tr("Ajustes avanzados de Pi"), detalle: tr("Todos los ajustes originales de Pi"), grupo: tr("Ajustes") },
+	{ nombre: tr("hotkeys"), etiqueta: tr("Atajos de teclado"), detalle: tr("Lista de todas las teclas rapidas"), grupo: tr("Ayuda") },
+	{ nombre: tr("changelog"), etiqueta: tr("Novedades de Pi"), detalle: tr("Cambios de la ultima version"), grupo: tr("Ayuda") },
+	{ nombre: tr("bug"), etiqueta: tr("Reportar un error a Pi"), detalle: tr("Envia un reporte a los desarrolladores de Pi"), grupo: tr("Ayuda") },
+	{ nombre: tr("quit"), etiqueta: tr("Salir del chat"), detalle: tr("Cierra el chat (la conversacion queda guardada)"), grupo: tr("Ayuda") },
 ];
 
 // Las preferencias se leen mucho (en cada cuadro de la barra): se guardan en memoria
@@ -80,10 +83,10 @@ function guardarPreferencias(cambios: Parameters<typeof guardarPreferenciasDisco
 
 /** Ideas para empezar, que se envian con un clic. */
 const SUGERENCIAS = [
-	{ id: "explicar", icono: "❝", etiqueta: "Explícame este proyecto", detalle: "Qué hay en esta carpeta", texto: "Explícame qué hay en esta carpeta y para qué sirve, en pocas palabras." },
-	{ id: "errores", icono: "✓", etiqueta: "Busca errores", detalle: "Revisa y dime qué falla", texto: "Revisa el proyecto y dime si ves errores o problemas, ordenados por importancia." },
-	{ id: "readme", icono: "✎", etiqueta: "Crea un README", detalle: "Documenta el proyecto", texto: "Crea un archivo README.md claro que explique este proyecto y cómo usarlo." },
-	{ id: "ideas", icono: "✦", etiqueta: "¿Qué puedes hacer?", detalle: "Ideas para empezar", texto: "¿Qué cosas puedes hacer por mí en esta carpeta? Dame ejemplos concretos." },
+	{ id: "explicar", icono: "❝", etiqueta: tr("Explícame este proyecto"), detalle: tr("Qué hay en esta carpeta"), texto: tr("Explícame qué hay en esta carpeta y para qué sirve, en pocas palabras.") },
+	{ id: "errores", icono: "✓", etiqueta: tr("Busca errores"), detalle: tr("Revisa y dime qué falla"), texto: tr("Revisa el proyecto y dime si ves errores o problemas, ordenados por importancia.") },
+	{ id: "readme", icono: "✎", etiqueta: tr("Crea un README"), detalle: tr("Documenta el proyecto"), texto: tr("Crea un archivo README.md claro que explique este proyecto y cómo usarlo.") },
+	{ id: "ideas", icono: "✦", etiqueta: tr("¿Qué puedes hacer?"), detalle: tr("Ideas para empezar"), texto: tr("¿Qué cosas puedes hacer por mí en esta carpeta? Dame ejemplos concretos.") },
 ];
 
 /** Boton de la columna lateral. */
@@ -147,7 +150,7 @@ class EditorHilosenda extends CustomEditor {
 	protected override renderTopBorder(width: number, hiddenLineCount: number): string {
 		if (hiddenLineCount > 0 || this.embedWorkingStatus) return super.renderTopBorder(width, hiddenLineCount);
 		const e = this.estilo();
-		const etiqueta = " ✎ Tu mensaje ";
+		const etiqueta = tr(" ✎ Tu mensaje ");
 		const extra = recortar(this.detalle(), Math.max(0, width - visibleWidth(etiqueta) - 6));
 		const texto = e.pintar(etiqueta, { fg: e.c.suave }) + (extra ? e.pintar(`${extra} `, { fg: e.c.texto, negrita: true }) : "");
 		return this.borderColor("──") + texto + this.borderColor("─".repeat(Math.max(0, width - 2 - visibleWidth(texto))));
@@ -190,7 +193,7 @@ class EditorHilosenda extends CustomEditor {
 		});
 		const vacio = this.getText().trim() === "" && !this.hayAdjuntos();
 		const fondo = vacio ? e.c.tarjeta : this.hover === "enviar" ? e.mezclar(e.c.acento, e.c.texto, 0.25) : e.c.acento;
-		const enviar = e.pastilla("  Enviar ▶  ", fondo, vacio ? e.c.tenue : e.c.textoSobreAcento);
+		const enviar = e.pastilla(`  ${tr("Enviar ▶")}  `, fondo, vacio ? e.c.tenue : e.c.textoSobreAcento);
 		const resto = Math.max(0, ANCHO_COLUMNA - visibleWidth(enviar) - 1);
 		salida.push(`${inferior}${borde(`┴${"─".repeat(resto)}`)}${enviar} `);
 		this.filaEnviar = salida.length - 1;
@@ -229,7 +232,7 @@ class EditorHilosenda extends CustomEditor {
 				this.presionado = "";
 				if (id && id === pulsado) {
 					if (id === "enviar") {
-						if (this.getText().trim() === "" && this.hayAdjuntos()) this.setText("Revisa lo que te adjunto.");
+						if (this.getText().trim() === "" && this.hayAdjuntos()) this.setText(tr("Revisa lo que te adjunto."));
 						if (this.getText().trim() !== "") this.handleInput("\r");
 					} else this.alPulsar?.(id);
 				}
@@ -309,7 +312,7 @@ export default function hilosenda(pi: ExtensionAPI) {
 	function ejecutarComando(ctx: ExtensionContext, texto: string) {
 		if (!editor?.onSubmit) {
 			ctx.ui.setEditorText(texto);
-			ctx.ui.notify("Pulsa Enter para ejecutar el comando.", "info");
+			ctx.ui.notify(tr("Pulsa Enter para ejecutar el comando."), "info");
 			return;
 		}
 		const borrador = editor.getText();
@@ -330,7 +333,7 @@ export default function hilosenda(pi: ExtensionAPI) {
 		return true;
 	}
 
-	const nombreModelo = (m: ModeloPi | undefined) => (m ? (m.name ?? m.id) : "sin modelo");
+	const nombreModelo = (m: ModeloPi | undefined) => (m ? (m.name ?? m.id) : tr("sin modelo"));
 	const contextoCorto = (n?: number) => (!n ? "" : n >= 1e6 ? `${(n / 1e6).toFixed(1).replace(/\.0$/, "")}M` : `${Math.round(n / 1000)}K`);
 
 	function nivelesDe(modelo: ModeloPi | undefined): string[] {
@@ -353,16 +356,16 @@ export default function hilosenda(pi: ExtensionAPI) {
 		const clave = leerClaves()[proveedor] as { type?: string } | undefined;
 		if (!enModelos && !clave) {
 			await ui.informar({
-				titulo: `No se puede quitar ${nombre} desde aquí`,
-				texto: `${nombre} está conectado con una variable de entorno o con credenciales del sistema (por ejemplo ${proveedor.toUpperCase().replace(/-/g, "_")}_API_KEY). Quítala de tu configuración del sistema y vuelve a abrir el chat.`,
+				titulo: tr("No se puede quitar {0} desde aquí", [nombre]),
+				texto: tr("{0} está conectado con una variable de entorno o con credenciales del sistema (por ejemplo {1}_API_KEY). Quítala de tu configuración del sistema y vuelve a abrir el chat.", [nombre, proveedor.toUpperCase().replace(/-/g, "_")]),
 			});
 			return false;
 		}
 		const si = await ui.confirmar({
-			titulo: `¿Quitar ${nombre}?`,
-			explicacion: `Se borrará ${clave?.type === "oauth" ? "la sesión iniciada" : clave ? "la clave API guardada" : "la configuración"} de ${nombre} en esta computadora. Podrás volver a conectarlo cuando quieras.`,
-			si: "Sí, quitar",
-			no: "Cancelar",
+			titulo: tr("¿Quitar {0}?", [nombre]),
+			explicacion: (clave?.type === "oauth" ? tr("Se borrará la sesión iniciada de {0} en esta computadora. Podrás volver a conectarlo cuando quieras.", [nombre]) : clave ? tr("Se borrará la clave API guardada de {0} en esta computadora. Podrás volver a conectarlo cuando quieras.", [nombre]) : tr("Se borrará la configuración de {0} en esta computadora. Podrás volver a conectarlo cuando quieras.", [nombre])),
+			si: tr("Sí, quitar"),
+			no: tr("Cancelar"),
 			peligro: true,
 		});
 		if (!si) return false;
@@ -370,7 +373,7 @@ export default function hilosenda(pi: ExtensionAPI) {
 		if (enModelos) quitarProveedor(proveedor);
 		if (leerAjustesPi().defaultProvider === proveedor) guardarAjustesPi({ defaultProvider: undefined, defaultModel: undefined });
 		await ctx.modelRegistry.refresh().catch(() => undefined);
-		ctx.ui.notify(`${nombre} quitado.${ctx.model?.provider === proveedor ? " Elige otro modelo para seguir chateando." : ""}`, "info");
+		ctx.ui.notify(`${tr("{0} quitado.", [nombre])}${ctx.model?.provider === proveedor ? ` ${tr("Elige otro modelo para seguir chateando.")}` : ""}`, "info");
 		return true;
 	}
 
@@ -378,7 +381,7 @@ export default function hilosenda(pi: ExtensionAPI) {
 		await conDialogo(ctx, async (ui) => {
 			const actual = ctx.model;
 			const describir = (m: ModeloPi) =>
-				[m.name && m.name !== m.id ? m.id : "", contextoCorto(m.contextWindow) && `${contextoCorto(m.contextWindow)} de contexto`, m.reasoning && "razona", m.input?.includes("image") && "ve imágenes"]
+				[m.name && m.name !== m.id ? m.id : "", contextoCorto(m.contextWindow) && tr("{0} de contexto", [contextoCorto(m.contextWindow)]), m.reasoning && tr("razona"), m.input?.includes("image") && tr("ve imagenes")]
 					.filter(Boolean)
 					.join(" · ");
 			const nombreProveedor = (id: string) => ctx.modelRegistry.getProviderDisplayName(id) ?? id;
@@ -387,7 +390,7 @@ export default function hilosenda(pi: ExtensionAPI) {
 					guardarAjustesPi({ defaultProvider: m.provider, defaultModel: m.id });
 					ctx.ui.notify(`Modelo: ${nombreModelo(m)}`, "info");
 				} else {
-					ctx.ui.notify("Ese modelo no tiene credenciales. Conéctalo primero.", "warning");
+					ctx.ui.notify(tr("Ese modelo no tiene credenciales. Conéctalo primero."), "warning");
 				}
 			};
 			let proveedor: string | undefined = busqueda ? "__todos" : undefined;
@@ -398,10 +401,10 @@ export default function hilosenda(pi: ExtensionAPI) {
 					const porProveedor = new Map<string, number>();
 					for (const m of disponibles) porProveedor.set(m.provider, (porProveedor.get(m.provider) ?? 0) + 1);
 					const eleccion = await ui.elegir({
-						titulo: "Elegir modelo · proveedor",
-						explicacion: "Primero elige el proveedor (la empresa o programa de la IA). Escribe para buscar.",
+						titulo: tr("Elegir modelo · proveedor"),
+						explicacion: tr("Primero elige el proveedor (la empresa o programa de la IA). Escribe para buscar."),
 						elementos: [
-							{ id: "__todos", etiqueta: "Todos los modelos", detalle: `${disponibles.length} modelos · buscar en todos`, valor: "__todos" },
+							{ id: "__todos", etiqueta: tr("Todos los modelos"), detalle: tr("{0} modelos · buscar en todos", [disponibles.length]), valor: "__todos" },
 							...[...porProveedor.entries()]
 								.sort((a, b) => nombreProveedor(a[0]).localeCompare(nombreProveedor(b[0])))
 								.map(([id, n]) => ({
@@ -414,16 +417,16 @@ export default function hilosenda(pi: ExtensionAPI) {
 						],
 						buscador: true,
 						inicial: actual?.provider,
-						vacio: "No hay ninguna IA conectada. Pulsa «Conectar otra IA».",
+						vacio: tr("No hay ninguna IA conectada. Pulsa «Conectar otra IA»."),
 						extras: [
-							{ id: "conectar", etiqueta: "+ Conectar otra IA", tipo: "primario" },
-							{ id: "quitar", etiqueta: "Quitar un proveedor", tipo: "peligro" },
+							{ id: "conectar", etiqueta: tr("+ Conectar otra IA"), tipo: "primario" },
+							{ id: "quitar", etiqueta: tr("Quitar un proveedor"), tipo: "peligro" },
 						],
 					});
 					if (eleccion?.boton === "conectar") return flujoConectar(ctx, ui);
 					if (eleccion?.boton === "quitar") {
 						const cual = await ui.elegir({
-							titulo: "¿Qué proveedor quieres quitar?",
+							titulo: tr("¿Qué proveedor quieres quitar?"),
 							elementos: [...porProveedor.keys()].map((id) => ({ id, etiqueta: nombreProveedor(id), detalle: id, valor: id })),
 							buscador: true,
 						});
@@ -440,11 +443,11 @@ export default function hilosenda(pi: ExtensionAPI) {
 				const lista = disponibles
 					.filter((m) => proveedor === "__todos" || m.provider === proveedor)
 					.filter((m) => !filtro || `${m.provider}/${m.id} ${m.name ?? ""}`.toLowerCase().includes(filtro));
-				const extras = [{ id: "proveedores", etiqueta: "← Proveedores", tipo: "suave" as const }];
-				if (proveedor !== "__todos") extras.push({ id: "quitar", etiqueta: "Quitar este proveedor", tipo: "peligro" as never });
+				const extras = [{ id: "proveedores", etiqueta: tr("← Proveedores"), tipo: "suave" as const }];
+				if (proveedor !== "__todos") extras.push({ id: "quitar", etiqueta: tr("Quitar este proveedor"), tipo: "peligro" as never });
 				const eleccion = await ui.elegir({
-					titulo: proveedor === "__todos" ? "Elegir modelo · todos" : `Elegir modelo · ${nombreProveedor(proveedor)}`,
-					explicacion: "Haz clic en un modelo para usarlo (queda guardado para la próxima vez). Escribe para buscar.",
+					titulo: proveedor === "__todos" ? tr("Elegir modelo · todos") : tr("Elegir modelo · {0}", [nombreProveedor(proveedor)]),
+					explicacion: tr("Haz clic en un modelo para usarlo (queda guardado para la próxima vez). Escribe para buscar."),
 					elementos: lista.map((m) => ({
 						id: `${m.provider}/${m.id}`,
 						etiqueta: `${actual && actual.provider === m.provider && actual.id === m.id ? "● " : "  "}${m.name ?? m.id}`,
@@ -492,9 +495,9 @@ export default function hilosenda(pi: ExtensionAPI) {
 		const modelo = ctx.modelRegistry.find(resultado.proveedor, resultado.modelo);
 		if (modelo && (await pi.setModel(modelo))) {
 			guardarAjustesPi({ defaultProvider: resultado.proveedor, defaultModel: resultado.modelo });
-			ctx.ui.notify(`Conectado. Ahora usas ${nombreModelo(modelo)}`, "info");
+			ctx.ui.notify(tr("Conectado. Ahora usas {0}", [nombreModelo(modelo)]), "info");
 		} else {
-			ctx.ui.notify("Conexion guardada. Elige el modelo con el boton «Modelo».", "info");
+			ctx.ui.notify(tr("Conexion guardada. Elige el modelo con el boton «Modelo»."), "info");
 		}
 	}
 
@@ -509,16 +512,16 @@ export default function hilosenda(pi: ExtensionAPI) {
 			const buscado = directo.toLowerCase();
 			const nivel = NIVELES.find((n) => n.id === buscado || n.etiqueta.toLowerCase() === buscado);
 			if (nivel) aplicar(nivel.id);
-			else ctx.ui.notify(`Nivel desconocido. Usa: ${NIVELES.map((n) => n.etiqueta.toLowerCase()).join(", ")}`, "warning");
+			else ctx.ui.notify(tr("Nivel desconocido. Usa: {0}", [NIVELES.map((n) => n.etiqueta.toLowerCase()).join(", ")]), "warning");
 			return;
 		}
 		await conDialogo(ctx, async (ui) => {
 			const actual = pi.getThinkingLevel();
 			const eleccion = await ui.elegir({
-				titulo: "¿Cuanto debe pensar la IA antes de responder?",
+				titulo: tr("¿Cuanto debe pensar la IA antes de responder?"),
 				explicacion: ctx.model?.reasoning
-					? "Mas razonamiento da mejores respuestas en problemas dificiles, pero tarda mas y gasta mas."
-					: `El modelo ${nombreModelo(ctx.model)} no admite razonamiento. Elige otro modelo para usar esta opcion.`,
+					? tr("Mas razonamiento da mejores respuestas en problemas dificiles, pero tarda mas y gasta mas.")
+					: tr("El modelo {0} no admite razonamiento. Elige otro modelo para usar esta opcion.", [nombreModelo(ctx.model)]),
 				elementos: NIVELES.filter((n) => permitidos.includes(n.id)).map((n) => ({
 					id: n.id,
 					etiqueta: `${n.id === actual ? "● " : "  "}${n.etiqueta}`,
@@ -536,52 +539,52 @@ export default function hilosenda(pi: ExtensionAPI) {
 			const destino = ruta ?? (await elegirCarpeta(ui, { inicio: ctx.cwd, ventana: leerPreferencias().selectorGrafico }));
 			if (!destino) return;
 			if (!existsSync(destino) || !statSync(destino).isDirectory()) {
-				ctx.ui.notify(`No existe la carpeta: ${destino}`, "error");
+				ctx.ui.notify(tr("No existe la carpeta: {0}", [destino]), "error");
 				return;
 			}
 			if (destino === ctx.cwd) return;
 			const seguir = await ui.confirmar({
-				titulo: `¿Abrir el chat en ${basename(destino) || destino}?`,
-				explicacion: "La conversacion actual queda guardada; puedes volver a ella desde «Historial».",
-				si: "Si, cambiar de carpeta",
-				no: "Cancelar",
+				titulo: tr("¿Abrir el chat en {0}?", [basename(destino) || destino]),
+				explicacion: tr("La conversacion actual queda guardada; puedes volver a ella desde «Historial»."),
+				si: tr("Si, cambiar de carpeta"),
+				no: tr("Cancelar"),
 			});
 			if (!seguir) return;
 			if (!pedirAlInicio(ctx, { accion: "carpeta", ruta: destino })) {
-				ctx.ui.notify(`Cierra el chat y ejecuta: hilosenda "${destino}"`, "info");
+				ctx.ui.notify(tr("Cierra el chat y ejecuta: hilosenda \"{0}\"", [destino]), "info");
 			}
 		});
 	}
 
 	async function abrirHistorial(ctx: ExtensionCommandContext) {
 		await conDialogo(ctx, async (ui) => {
-			const sesiones = await ui.esperar("Cargando tus conversaciones…", SessionManager.listAll());
+			const sesiones = await ui.esperar(tr("Cargando tus conversaciones…"), SessionManager.listAll());
 			const actual = ctx.sessionManager.getSessionFile?.();
 			const ahora = Date.now();
 			const grupo = (fecha: Date) => {
 				const dias = (ahora - new Date(fecha).getTime()) / 86400000;
-				return dias < 1 ? "Hoy" : dias < 2 ? "Ayer" : dias < 7 ? "Esta semana" : dias < 31 ? "Este mes" : "Mas antiguas";
+				return dias < 1 ? "Hoy" : dias < 2 ? "Ayer" : dias < 7 ? tr("Esta semana") : dias < 31 ? tr("Este mes") : tr("Mas antiguas");
 			};
 			const elementos = sesiones
 				.filter((s) => s.path !== actual)
 				.map((s) => {
-					const titulo = (s.name || s.firstMessage || "(conversacion vacia)").replace(/\s+/g, " ").trim();
+					const titulo = (s.name || s.firstMessage || tr("(conversacion vacia)")).replace(/\s+/g, " ").trim();
 					const misma = s.cwd === ctx.cwd;
 					return {
 						id: s.path,
 						etiqueta: titulo.length > 60 ? `${titulo.slice(0, 59)}…` : titulo,
-						detalle: `${new Date(s.modified).toLocaleString("es", { dateStyle: "short", timeStyle: "short" })} · ${s.messageCount} mensajes${misma ? "" : ` · en ${basename(s.cwd) || s.cwd}`}`,
+						detalle: `${new Date(s.modified).toLocaleString(localeFechas, { dateStyle: "short", timeStyle: "short" })} · ${tr("{0} mensajes", [s.messageCount])}${misma ? "" : ` · ${tr("en {0}", [basename(s.cwd) || s.cwd])}`}`,
 						grupo: grupo(s.modified),
 						buscarEn: s.allMessagesText?.slice(0, 4000),
 						valor: s,
 					};
 				});
 			const elegida = await ui.elegir({
-				titulo: "Conversaciones anteriores",
-				explicacion: "Haz clic para continuar una conversacion. Escribe para buscar cualquier palabra que se haya dicho.",
+				titulo: tr("Conversaciones anteriores"),
+				explicacion: tr("Haz clic para continuar una conversacion. Escribe para buscar cualquier palabra que se haya dicho."),
 				elementos,
 				buscador: true,
-				vacio: "No hay otras conversaciones todavia.",
+				vacio: tr("No hay otras conversaciones todavia."),
 			});
 			if (!elegida || elegida.boton) return;
 			if (!elegida.cwd || elegida.cwd === ctx.cwd) {
@@ -597,17 +600,17 @@ export default function hilosenda(pi: ExtensionAPI) {
 	async function mostrarMenu(ctx: ExtensionContext) {
 		await conDialogo(ctx, async (ui) => {
 			const propios = [
-				{ id: "h:conectar", etiqueta: "Conectar una IA", detalle: "Agrega Ollama, Claude, GPT, Gemini o cualquier otra; detecta sus modelos solo", grupo: "hilosenda" },
-				{ id: "h:imagen", etiqueta: "Adjuntar archivo o imagen", detalle: "Envía fotos o documentos junto a tu mensaje (también: Ctrl+V, clic derecho o arrastrar)", grupo: "hilosenda" },
-				{ id: "h:modelo", etiqueta: "Elegir modelo", detalle: "Cambia la IA que responde", grupo: "hilosenda" },
-				{ id: "h:razonamiento", etiqueta: "Razonamiento", detalle: "Cuanto piensa la IA antes de responder", grupo: "hilosenda" },
-				{ id: "h:historial", etiqueta: "Conversaciones anteriores", detalle: "Busca y continua cualquier chat anterior", grupo: "hilosenda" },
-				{ id: "h:carpeta", etiqueta: "Cambiar de carpeta", detalle: "Abre el chat en otro proyecto", grupo: "hilosenda" },
-				{ id: "h:instrucciones", etiqueta: "Instrucciones (.md / .txt)", detalle: "Elige un archivo con reglas que la IA siempre sigue", grupo: "hilosenda" },
-				{ id: "h:permisos", etiqueta: "Permisos", detalle: "Preguntar antes de cambiar cosas, libre o solo mirar", grupo: "hilosenda" },
-				{ id: "h:ajustes", etiqueta: "Ajustes de hilosenda", detalle: "Barra de botones, consejos, tema...", grupo: "hilosenda" },
-				{ id: "h:inicio", etiqueta: "Volver a la pantalla de inicio", detalle: "Cierra el chat y vuelve al menu principal", grupo: "hilosenda" },
-				{ id: "h:ayuda", etiqueta: "Ayuda", detalle: "Como usar hilosenda paso a paso", grupo: "hilosenda" },
+				{ id: "h:conectar", etiqueta: tr("Conectar una IA"), detalle: tr("Agrega Ollama, Claude, GPT, Gemini o cualquier otra; detecta sus modelos solo"), grupo: tr("hilosenda") },
+				{ id: "h:imagen", etiqueta: tr("Adjuntar archivo o imagen"), detalle: tr("Envía fotos o documentos junto a tu mensaje (también: Ctrl+V, clic derecho o arrastrar)"), grupo: tr("hilosenda") },
+				{ id: "h:modelo", etiqueta: tr("Elegir modelo"), detalle: tr("Cambia la IA que responde"), grupo: tr("hilosenda") },
+				{ id: "h:razonamiento", etiqueta: tr("Razonamiento"), detalle: tr("Cuanto piensa la IA antes de responder"), grupo: tr("hilosenda") },
+				{ id: "h:historial", etiqueta: tr("Conversaciones anteriores"), detalle: tr("Busca y continua cualquier chat anterior"), grupo: tr("hilosenda") },
+				{ id: "h:carpeta", etiqueta: tr("Cambiar de carpeta"), detalle: tr("Abre el chat en otro proyecto"), grupo: tr("hilosenda") },
+				{ id: "h:instrucciones", etiqueta: tr("Instrucciones (.md / .txt)"), detalle: tr("Elige un archivo con reglas que la IA siempre sigue"), grupo: tr("hilosenda") },
+				{ id: "h:permisos", etiqueta: tr("Permisos"), detalle: tr("Preguntar antes de cambiar cosas, libre o solo mirar"), grupo: tr("hilosenda") },
+				{ id: "h:ajustes", etiqueta: tr("Ajustes de hilosenda"), detalle: tr("Barra de botones, consejos, tema..."), grupo: tr("hilosenda") },
+				{ id: "h:inicio", etiqueta: tr("Volver a la pantalla de inicio"), detalle: tr("Cierra el chat y vuelve al menu principal"), grupo: tr("hilosenda") },
+				{ id: "h:ayuda", etiqueta: tr("Ayuda"), detalle: tr("Como usar hilosenda paso a paso"), grupo: tr("hilosenda") },
 			];
 			const integrados = COMANDOS_PI.map((c) => ({ id: `p:${c.nombre}`, etiqueta: c.etiqueta, detalle: `${c.detalle}  (/${c.nombre})`, grupo: c.grupo, buscarEn: c.nombre }));
 			const conocidos = new Set([...COMANDOS_PI.map((c) => c.nombre), ...COMANDOS_HILOSENDA]);
@@ -618,11 +621,11 @@ export default function hilosenda(pi: ExtensionAPI) {
 					id: `p:${c.name}`,
 					etiqueta: `/${c.name}`,
 					detalle: c.description ?? "",
-					grupo: c.source === "skill" ? "Habilidades" : c.source === "prompt" ? "Plantillas de mensajes" : "Comandos de extensiones",
+					grupo: c.source === "skill" ? tr("Habilidades") : c.source === "prompt" ? tr("Plantillas de mensajes") : tr("Comandos de extensiones"),
 				}));
 			const eleccion = await ui.elegir({
-				titulo: "Menu: todas las funciones",
-				explicacion: "Haz clic en lo que quieras hacer. Escribe para buscar. Entre parentesis esta el comando equivalente.",
+				titulo: tr("Menu: todas las funciones"),
+				explicacion: tr("Haz clic en lo que quieras hacer. Escribe para buscar. Entre parentesis esta el comando equivalente."),
 				elementos: [...propios, ...integrados, ...otros],
 				buscador: true,
 			});
@@ -641,28 +644,28 @@ export default function hilosenda(pi: ExtensionAPI) {
 		await conDialogo(ctx, async (ui) => {
 			while (true) {
 				const p = leerPreferencias();
-				const siNo = (v: boolean) => (v ? "Si" : "No");
+				const siNo = (v: boolean) => (v ? tr("Si") : tr("No"));
 				const eleccion = await ui.elegir({
-					titulo: "Ajustes de hilosenda",
-					explicacion: "Haz clic en un ajuste para cambiarlo.",
+					titulo: tr("Ajustes de hilosenda"),
+					explicacion: tr("Haz clic en un ajuste para cambiarlo."),
 					elementos: [
-						{ id: "tema", etiqueta: "Tema de colores", detalle: { auto: "hilosenda automático", oscuro: "hilosenda oscuro", claro: "hilosenda claro", pi: "el de Pi" }[p.tema ?? "auto"] ?? "hilosenda", valor: "tema" },
-						{ id: "barra", etiqueta: "Barra de botones", detalle: !p.barraBotones ? "Oculta" : p.barraCompleta ? "Completa" : "Sencilla", valor: "barra" },
-						{ id: "principiante", etiqueta: "Consejos para principiantes", detalle: siNo(p.modoPrincipiante), valor: "principiante" },
-						{ id: "permisos", etiqueta: "Permisos de la IA", detalle: permisoPorId(p.permisos).etiqueta, valor: "permisos" },
-						{ id: "ventana", etiqueta: "Ventana del sistema para elegir carpetas", detalle: siNo(p.selectorGrafico), valor: "ventana" },
-						{ id: "pi", etiqueta: "Ajustes avanzados de Pi", detalle: "Todos los ajustes originales (/settings)", valor: "pi" },
+						{ id: "tema", etiqueta: tr("Tema de colores"), detalle: { auto: tr("hilosenda automático"), oscuro: tr("hilosenda oscuro"), claro: tr("hilosenda claro"), pi: tr("el de Pi") }[p.tema ?? "auto"] ?? "hilosenda", valor: "tema" },
+						{ id: "barra", etiqueta: tr("Barra de botones"), detalle: !p.barraBotones ? "Oculta" : p.barraCompleta ? "Completa" : "Sencilla", valor: "barra" },
+						{ id: "principiante", etiqueta: tr("Consejos para principiantes"), detalle: siNo(p.modoPrincipiante), valor: "principiante" },
+						{ id: "permisos", etiqueta: tr("Permisos de la IA"), detalle: permisoPorId(p.permisos).etiqueta, valor: "permisos" },
+						{ id: "ventana", etiqueta: tr("Ventana del sistema para elegir carpetas"), detalle: siNo(p.selectorGrafico), valor: "ventana" },
+						{ id: "pi", etiqueta: tr("Ajustes avanzados de Pi"), detalle: tr("Todos los ajustes originales (/settings)"), valor: "pi" },
 					],
 				});
 				if (typeof eleccion !== "string") return;
 				if (eleccion === "tema") {
 					const tema = await ui.elegir({
-						titulo: "Tema de colores",
+						titulo: tr("Tema de colores"),
 						elementos: [
-							{ id: "auto", etiqueta: "hilosenda automático", detalle: "Claro u oscuro según tu consola", valor: "auto" },
-							{ id: "oscuro", etiqueta: "hilosenda oscuro", valor: "oscuro" },
-							{ id: "claro", etiqueta: "hilosenda claro", valor: "claro" },
-							{ id: "pi", etiqueta: "El tema de Pi", detalle: "El que elijas en los ajustes avanzados de Pi", valor: "pi" },
+							{ id: "auto", etiqueta: tr("hilosenda automático"), detalle: tr("Claro u oscuro según tu consola"), valor: "auto" },
+							{ id: "oscuro", etiqueta: tr("hilosenda oscuro"), valor: "oscuro" },
+							{ id: "claro", etiqueta: tr("hilosenda claro"), valor: "claro" },
+							{ id: "pi", etiqueta: tr("El tema de Pi"), detalle: tr("El que elijas en los ajustes avanzados de Pi"), valor: "pi" },
 						],
 						inicial: p.tema ?? "auto",
 					});
@@ -670,15 +673,15 @@ export default function hilosenda(pi: ExtensionAPI) {
 						guardarPreferencias({ tema: tema as "auto" | "oscuro" | "claro" | "pi" });
 						const nombre = tema === "oscuro" ? "hilosenda-oscuro" : tema === "claro" ? "hilosenda-claro" : undefined;
 						if (nombre) ctx.ui.setTheme(nombre);
-						else ctx.ui.notify("El tema se aplicará la próxima vez que abras el chat.", "info");
+						else ctx.ui.notify(tr("El tema se aplicará la próxima vez que abras el chat."), "info");
 					}
 				} else if (eleccion === "barra") {
 					const modo = await ui.elegir({
-						titulo: "Barra de botones del chat",
+						titulo: tr("Barra de botones del chat"),
 						elementos: [
-							{ id: "sencilla", etiqueta: "Sencilla", detalle: "Menú, modelo, nuevo chat e inicio (recomendada)", valor: "sencilla" },
-							{ id: "completa", etiqueta: "Completa", detalle: "Además razonamiento, permisos, instrucciones, carpeta e historial", valor: "completa" },
-							{ id: "oculta", etiqueta: "Oculta", detalle: "Solo comandos (escribe /menu)", valor: "oculta" },
+							{ id: "sencilla", etiqueta: tr("Sencilla"), detalle: tr("Menú, modelo, nuevo chat e inicio (recomendada)"), valor: "sencilla" },
+							{ id: "completa", etiqueta: tr("Completa"), detalle: tr("Además razonamiento, permisos, instrucciones, carpeta e historial"), valor: "completa" },
+							{ id: "oculta", etiqueta: tr("Oculta"), detalle: tr("Solo comandos (escribe /menu)"), valor: "oculta" },
 						],
 						inicial: !p.barraBotones ? "oculta" : p.barraCompleta ? "completa" : "sencilla",
 					});
@@ -727,7 +730,7 @@ export default function hilosenda(pi: ExtensionAPI) {
 			case "ajustes":
 				return ajustes(ctx);
 			case "ayuda":
-				return conDialogo(ctx, (ui) => ui.informar({ titulo: "Como usar hilosenda", texto: AYUDA_GENERAL }));
+				return conDialogo(ctx, (ui) => ui.informar({ titulo: tr("Como usar hilosenda"), texto: AYUDA_GENERAL }));
 			case "inicio":
 				if (!pedirAlInicio(ctx, { accion: "inicio" })) ctx.shutdown();
 				return;
@@ -774,7 +777,7 @@ export default function hilosenda(pi: ExtensionAPI) {
 		}
 		if (!alguno) return false;
 		if (adjuntos.some((a) => a.imagen) && !ctx.model?.input?.includes("image")) {
-			ctx.ui.notify(`Ojo: ${nombreModelo(ctx.model)} no puede ver imágenes. Cambia a un modelo que sí pueda (por ejemplo Claude, GPT o Gemini).`, "warning");
+			ctx.ui.notify(tr("Ojo: {0} no puede ver imágenes. Cambia a un modelo que sí pueda (por ejemplo Claude, GPT o Gemini).", [nombreModelo(ctx.model)]), "warning");
 		}
 		instalarAdjuntos(ctx);
 		return true;
@@ -782,7 +785,7 @@ export default function hilosenda(pi: ExtensionAPI) {
 
 	function adjuntarImagenPegada(ctx: ExtensionContext, datos: Buffer, mime: string) {
 		const n = adjuntos.filter((a) => a.imagen).length + 1;
-		adjuntos.push({ nombre: `imagen pegada ${n}`, bytes: datos.length, imagen: { type: "image", data: datos.toString("base64"), mimeType: mime } });
+		adjuntos.push({ nombre: tr("imagen pegada {0}", [n]), bytes: datos.length, imagen: { type: "image", data: datos.toString("base64"), mimeType: mime } });
 		instalarAdjuntos(ctx);
 	}
 
@@ -790,19 +793,19 @@ export default function hilosenda(pi: ExtensionAPI) {
 	async function pegarPortapapeles(ctx: ExtensionContext) {
 		if (pegandoAhora) return;
 		pegandoAhora = true;
-		ctx.ui.setWorkingMessage("Pegando…");
+		ctx.ui.setWorkingMessage(tr("Pegando…"));
 		try {
 			await pegarPortapapelesAhora(ctx);
 		} finally {
 			pegandoAhora = false;
-			ctx.ui.setWorkingMessage("Trabajando… (Esc para detener)");
+			ctx.ui.setWorkingMessage(tr("Trabajando… (Esc para detener)"));
 		}
 	}
 
 	async function pegarPortapapelesAhora(ctx: ExtensionContext) {
 		const contenido = await leerPortapapeles().catch(() => undefined);
 		if (!contenido) {
-			ctx.ui.notify("El portapapeles está vacío o no se pudo leer (en Linux instala wl-clipboard o xclip).", "warning");
+			ctx.ui.notify(tr("El portapapeles está vacío o no se pudo leer (en Linux instala wl-clipboard o xclip)."), "warning");
 			return;
 		}
 		if (contenido.tipo === "archivos") adjuntarArchivos(ctx, contenido.rutas);
@@ -855,7 +858,7 @@ export default function hilosenda(pi: ExtensionAPI) {
 				return {
 					render(ancho: number) {
 						const e = estiloActual();
-						const lineas = ["", e.pintar(`  Se enviará con tu mensaje (${adjuntos.length}):`, { fg: e.c.suave })];
+						const lineas = ["", e.pintar(tr("  Se enviará con tu mensaje ({0}):", [adjuntos.length]), { fg: e.c.suave })];
 						zonas = [];
 						adjuntos.forEach((a, i) => {
 							for (const l of vistaDe(a, ancho)) lineas.push(`    ${l}`);
@@ -899,9 +902,9 @@ export default function hilosenda(pi: ExtensionAPI) {
 			if (!a.ruta) continue;
 			const esTexto = a.bytes > 0 && a.bytes <= 200 * 1024 && !readFileSync(a.ruta).subarray(0, 4096).includes(0);
 			if (esTexto) {
-				partes.push(`Archivo adjunto «${a.nombre}» (${a.ruta}):\n\`\`\`\n${readFileSync(a.ruta, "utf8")}\n\`\`\``);
+				partes.push(tr("Archivo adjunto «{0}» ({1}):\n\`\`\`\n{2}\n\`\`\`", [a.nombre, a.ruta, readFileSync(a.ruta, "utf8")]));
 			} else {
-				partes.push(`Archivo adjunto «${a.nombre}»: ${a.ruta}\n(Ábrelo o conviértelo con tus herramientas para leer su contenido.)`);
+				partes.push(tr("Archivo adjunto «{0}»: {1}\n(Ábrelo o conviértelo con tus herramientas para leer su contenido.)", [a.nombre, a.ruta]));
 			}
 		}
 		return partes.join("\n\n");
@@ -909,15 +912,15 @@ export default function hilosenda(pi: ExtensionAPI) {
 
 	function botonesLaterales(): BotonLateral[] {
 		const lista: BotonLateral[] = [];
-		if (trabajando) lista.push({ id: "detener", icono: "■", etiqueta: "Detener", peligro: true });
+		if (trabajando) lista.push({ id: "detener", icono: "■", etiqueta: tr("Detener"), peligro: true });
 		lista.push(
-			{ id: "imagen", icono: "▣", etiqueta: "Adjuntar archivo" },
-			{ id: "modelo", icono: "◆", etiqueta: "Cambiar modelo" },
-			{ id: "razonamiento", icono: "◑", etiqueta: "Razonamiento" },
-			{ id: "historial", icono: "❝", etiqueta: "Chats anteriores" },
-			{ id: "nuevo", icono: "✚", etiqueta: "Nuevo chat" },
-			{ id: "menu", icono: "≡", etiqueta: "Más opciones" },
-			{ id: "inicio", icono: "⌂", etiqueta: "Inicio" },
+			{ id: "imagen", icono: "▣", etiqueta: tr("Adjuntar archivo") },
+			{ id: "modelo", icono: "◆", etiqueta: tr("Cambiar modelo") },
+			{ id: "razonamiento", icono: "◑", etiqueta: tr("Razonamiento") },
+			{ id: "historial", icono: "❝", etiqueta: tr("Chats anteriores") },
+			{ id: "nuevo", icono: "✚", etiqueta: tr("Nuevo chat") },
+			{ id: "menu", icono: "≡", etiqueta: tr("Más opciones") },
+			{ id: "inicio", icono: "⌂", etiqueta: tr("Inicio") },
 		);
 		return lista;
 	}
@@ -927,27 +930,27 @@ export default function hilosenda(pi: ExtensionAPI) {
 		const p = leerPreferencias();
 		type BotonBarra = { id: string; etiqueta: string; icono?: string; tipo?: "primario" | "normal" | "peligro" | "suave" };
 		const botones: BotonBarra[] = [];
-		if (trabajando) botones.push({ id: "detener", icono: "■", etiqueta: "Detener", tipo: "peligro" });
-		botones.push({ id: "menu", icono: "≡", etiqueta: "Menú" }, { id: "modelo", icono: "◆", etiqueta: `${recortar(nombreModelo(ctx?.model), 26)} ▾` });
+		if (trabajando) botones.push({ id: "detener", icono: "■", etiqueta: tr("Detener"), tipo: "peligro" });
+		botones.push({ id: "menu", icono: "≡", etiqueta: tr("Menú") }, { id: "modelo", icono: "◆", etiqueta: `${recortar(nombreModelo(ctx?.model), 26)} ▾` });
 		if (p.barraCompleta) {
 			botones.push(
-				{ id: "razonamiento", icono: "◑", etiqueta: `${ctx?.model?.reasoning ? nombreNivel(pi.getThinkingLevel()) : "Sin razonar"} ▾` },
+				{ id: "razonamiento", icono: "◑", etiqueta: `${ctx?.model?.reasoning ? nombreNivel(pi.getThinkingLevel()) : tr("Sin razonar")} ▾` },
 				{ id: "permisos", icono: "◈", etiqueta: `${permisoPorId(p.permisos).corto} ▾` },
-				{ id: "instrucciones", icono: "✎", etiqueta: `${p.instrucciones && p.instruccionesActivas ? recortar(nombreCorto(p.instrucciones), 16) : "Sin instrucciones"} ▾` },
+				{ id: "instrucciones", icono: "✎", etiqueta: `${p.instrucciones && p.instruccionesActivas ? recortar(nombreCorto(p.instrucciones), 16) : tr("Sin instrucciones")} ▾` },
 				{ id: "carpeta", icono: "▤", etiqueta: `${recortar(basename(ctx?.cwd ?? "") || "/", 16)} ▾` },
 			);
 		}
 		const derechaDesde = botones.length;
 		const derecha: BotonBarra[] = p.barraCompleta
 			? [
-					{ id: "nuevo", icono: "✚", etiqueta: "Nuevo" },
-					{ id: "historial", icono: "❝", etiqueta: "Historial" },
-					{ id: "inicio", icono: "⌂", etiqueta: "Inicio" },
-					{ id: "ayuda", icono: "?", etiqueta: "Ayuda" },
+					{ id: "nuevo", icono: "✚", etiqueta: tr("Nuevo") },
+					{ id: "historial", icono: "❝", etiqueta: tr("Historial") },
+					{ id: "inicio", icono: "⌂", etiqueta: tr("Inicio") },
+					{ id: "ayuda", icono: "?", etiqueta: tr("Ayuda") },
 				]
 			: [
-					{ id: "nuevo", icono: "✚", etiqueta: "Nuevo chat" },
-					{ id: "inicio", icono: "⌂", etiqueta: "Inicio" },
+					{ id: "nuevo", icono: "✚", etiqueta: tr("Nuevo chat") },
+					{ id: "inicio", icono: "⌂", etiqueta: tr("Inicio") },
 				];
 		// En ventanas estrechas, los accesos de la derecha quedan solo con su icono.
 		for (const b of derecha) botones.push(compacta ? { id: b.id, etiqueta: b.icono ?? b.etiqueta, tipo: "suave" } : { ...b, tipo: "suave" });
@@ -1093,9 +1096,9 @@ export default function hilosenda(pi: ExtensionAPI) {
 					const gris = e.c.suave;
 					const partes: Array<{ id?: string; segmentos: Array<{ t: string; fg?: unknown; negrita?: boolean }> }> = [
 						{ id: "carpeta", segmentos: [{ t: "▤ ", fg: e.c.tenue }, { t: recortar(carpeta, 40), fg: gris }, ...(rama ? [{ t: ` (${rama})`, fg: e.c.tenue }] : [])] },
-						{ id: "razonamiento", segmentos: [{ t: "◑ ", fg: e.c.tenue }, { t: c?.model?.reasoning ? `razona: ${nombreNivel(pi.getThinkingLevel()).toLowerCase()}` : "sin razonar", fg: gris }] },
+						{ id: "razonamiento", segmentos: [{ t: "◑ ", fg: e.c.tenue }, { t: c?.model?.reasoning ? tr("razona: {0}", [nombreNivel(pi.getThinkingLevel()).toLowerCase()]) : tr("sin razonar"), fg: gris }] },
 						{ id: "permisos", segmentos: [{ t: "◈ ", fg: e.c.tenue }, { t: permisoPorId(p.permisos).etiqueta.toLowerCase(), fg: gris }] },
-						{ segmentos: [{ t: "memoria ", fg: e.c.tenue }, { t: "▰".repeat(llenos), fg: colorUso }, { t: "▱".repeat(8 - llenos), fg: e.c.borde }, { t: ` ${Math.round(porcentaje ?? 0)}%`, fg: gris }] },
+						{ segmentos: [{ t: `${tr("memoria")} `, fg: e.c.tenue }, { t: "▰".repeat(llenos), fg: colorUso }, { t: "▱".repeat(8 - llenos), fg: e.c.borde }, { t: ` ${Math.round(porcentaje ?? 0)}%`, fg: gris }] },
 					];
 					if (costo > 0) partes.push({ segmentos: [{ t: `$${costo < 0.01 ? costo.toFixed(4) : costo.toFixed(2)}`, fg: e.c.suave }] });
 					const estados = [...datos.getExtensionStatuses().entries()].filter(([clave]) => clave !== "hilosenda").map(([, valor]) => valor);
@@ -1149,8 +1152,8 @@ export default function hilosenda(pi: ExtensionAPI) {
 				const lineas = ["", "", centrar(marca), ""];
 				if (leerPreferencias().modoPrincipiante) {
 					lineas.push(
-						centrar(e.pintar("¿En qué te ayudo hoy?", { fg: e.c.texto, negrita: true })),
-						centrar(e.pintar("Escribe abajo lo que necesitas, como si hablaras con una persona.", { fg: e.c.suave })),
+						centrar(e.pintar(tr("¿En qué te ayudo hoy?"), { fg: e.c.texto, negrita: true })),
+						centrar(e.pintar(tr("Escribe abajo lo que necesitas, como si hablaras con una persona."), { fg: e.c.suave })),
 					);
 				}
 				lineas.push("");
@@ -1188,10 +1191,10 @@ export default function hilosenda(pi: ExtensionAPI) {
 			const s = typeof v === "string" ? v : JSON.stringify(v, null, 2);
 			return s.length > max ? `${s.slice(0, max)}…` : s;
 		};
-		if (nombre === "bash" || nombre === "powershell") return { titulo: "La IA quiere ejecutar un comando", detalle: `Comando:\n  ${texto(entrada.command)}` };
-		if (nombre === "write") return { titulo: "La IA quiere crear o reemplazar un archivo", detalle: `Archivo: ${entrada.path}\n\n${texto(entrada.content, 400)}` };
-		if (nombre === "edit") return { titulo: "La IA quiere modificar un archivo", detalle: `Archivo: ${entrada.path}` };
-		return { titulo: `La IA quiere usar la herramienta «${nombre}»`, detalle: texto(entrada) };
+		if (nombre === "bash" || nombre === "powershell") return { titulo: tr("La IA quiere ejecutar un comando"), detalle: `${tr("Comando:")}\n  ${texto(entrada.command)}` };
+		if (nombre === "write") return { titulo: tr("La IA quiere crear o reemplazar un archivo"), detalle: `${tr("Archivo:")} ${entrada.path}\n\n${texto(entrada.content, 400)}` };
+		if (nombre === "edit") return { titulo: tr("La IA quiere modificar un archivo"), detalle: `${tr("Archivo:")} ${entrada.path}` };
+		return { titulo: tr("La IA quiere usar la herramienta «{0}»", [nombre]), detalle: texto(entrada) };
 	}
 
 	// --- Eventos ------------------------------------------------------------------------
@@ -1226,7 +1229,7 @@ export default function hilosenda(pi: ExtensionAPI) {
 		instalarPie(ctx);
 		aplicarModoPermisos(ctx);
 		ctx.ui.setTitle(`hilosenda · ${basename(ctx.cwd) || ctx.cwd}`);
-		ctx.ui.setWorkingMessage("Trabajando… (Esc para detener)");
+		ctx.ui.setWorkingMessage(tr("Trabajando… (Esc para detener)"));
 		const alIniciar = process.env.HILOSENDA_AL_INICIAR;
 		if (alIniciar) {
 			delete process.env.HILOSENDA_AL_INICIAR;
@@ -1271,11 +1274,14 @@ export default function hilosenda(pi: ExtensionAPI) {
 		if (p.instrucciones && p.instruccionesActivas && existsSync(p.instrucciones)) {
 			try {
 				let contenido = readFileSync(p.instrucciones, "utf8");
-				if (contenido.length > MAX_INSTRUCCIONES) contenido = `${contenido.slice(0, MAX_INSTRUCCIONES)}\n…(archivo recortado)`;
+				if (contenido.length > MAX_INSTRUCCIONES) contenido = tr("{0}\n…(archivo recortado)", [contenido.slice(0, MAX_INSTRUCCIONES)]);
 				opciones.contextFiles = [...opciones.contextFiles, { path: p.instrucciones, content: contenido }];
 			} catch {
 				// Si no se puede leer, se sigue sin instrucciones.
 			}
+		}
+		if (idioma !== "en") {
+			opciones.appendSystemPrompt = `${opciones.appendSystemPrompt ?? ""}\n\nThe user's interface language is ${NOMBRE_IDIOMA_EN[idioma] ?? idioma}. Reply in that language unless the user writes in another one.`.trim();
 		}
 		if (p.permisos === "lectura") {
 			opciones.appendSystemPrompt = `${opciones.appendSystemPrompt ?? ""}\n\nThe user enabled read-only mode: you can read and search files, but you must not modify files or run commands. If a change is needed, explain exactly what you would do.`.trim();
@@ -1287,7 +1293,7 @@ export default function hilosenda(pi: ExtensionAPI) {
 		const modo = leerPreferencias().permisos;
 		if (modo === "libre" || !necesitaPermiso(evento.toolName)) return undefined;
 		if (modo === "lectura") {
-			return { block: true, reason: "Read-only mode is on (hilosenda «Solo mirar»). Do not modify files or run commands; describe the change instead." };
+			return { block: true, reason: ("Read-only mode is on (hilosenda «Solo mirar»). Do not modify files or run commands; describe the change instead.") };
 		}
 		if (permitidosEnSesion.has(evento.toolName) || !ctx.hasUI) return undefined;
 
@@ -1301,10 +1307,10 @@ export default function hilosenda(pi: ExtensionAPI) {
 				explicacion: detalle,
 				grande: false,
 				botones: [
-					{ id: "si", etiqueta: "Permitir", tipo: "primario", ayuda: "Solo esta vez" },
-					{ id: "siempre", etiqueta: "Permitir siempre en este chat", ayuda: `No volver a preguntar por «${evento.toolName}» en esta conversacion` },
-					{ id: "no", etiqueta: "No permitir", tipo: "peligro", ayuda: "La IA buscara otra forma" },
-					{ id: "explicar", etiqueta: "No, y decirle por que", ayuda: "Escribe que prefieres que haga" },
+					{ id: "si", etiqueta: tr("Permitir"), tipo: "primario", ayuda: tr("Solo esta vez") },
+					{ id: "siempre", etiqueta: tr("Permitir siempre en este chat"), ayuda: tr("No volver a preguntar por «{0}» en esta conversacion", [evento.toolName]) },
+					{ id: "no", etiqueta: tr("No permitir"), tipo: "peligro", ayuda: tr("La IA buscara otra forma") },
+					{ id: "explicar", etiqueta: tr("No, y decirle por que"), ayuda: tr("Escribe que prefieres que haga") },
 				],
 			});
 			if (respuesta === "si") return undefined;
@@ -1313,7 +1319,7 @@ export default function hilosenda(pi: ExtensionAPI) {
 				return undefined;
 			}
 			if (respuesta === "explicar") {
-				const motivo = await ui.preguntar({ titulo: "¿Por que no?", etiqueta: "Explicale a la IA que prefieres:" });
+				const motivo = await ui.preguntar({ titulo: tr("¿Por que no?"), etiqueta: tr("Explicale a la IA que prefieres:") });
 				return { block: true, reason: `The user did not allow this.${motivo ? ` User says: ${motivo}` : ""}` };
 			}
 			return { block: true, reason: "The user did not allow this action." };
@@ -1324,21 +1330,21 @@ export default function hilosenda(pi: ExtensionAPI) {
 
 	// --- Comandos en español (tambien los usan los botones) ----------------------------
 
-	pi.registerCommand("menu", { description: "Muestra todas las funciones con explicaciones (hilosenda)", handler: async (_a, ctx) => mostrarMenu(ctx) });
+	pi.registerCommand("menu", { description: tr("Muestra todas las funciones con explicaciones (hilosenda)"), handler: async (_a, ctx) => mostrarMenu(ctx) });
 	pi.registerCommand("modelo", {
-		description: "Elige el modelo de IA; acepta texto para buscar (hilosenda)",
+		description: tr("Elige el modelo de IA; acepta texto para buscar (hilosenda)"),
 		handler: async (args, ctx) => elegirModelo(ctx, args?.trim() || undefined),
 	});
 	pi.registerCommand("razonamiento", {
-		description: "Cuanto piensa la IA: apagado, bajo, medio, alto... (hilosenda)",
+		description: tr("Cuanto piensa la IA: apagado, bajo, medio, alto... (hilosenda)"),
 		handler: async (args, ctx) => elegirRazonamiento(ctx, args?.trim() || undefined),
 	});
 	pi.registerCommand("carpeta", {
-		description: "Abre el chat en otra carpeta; acepta una ruta (hilosenda)",
+		description: tr("Abre el chat en otra carpeta; acepta una ruta (hilosenda)"),
 		handler: async (args, ctx) => cambiarCarpeta(ctx, args?.trim() || undefined),
 	});
 	pi.registerCommand("permisos", {
-		description: "Preguntar antes, libre o solo mirar (hilosenda)",
+		description: tr("Preguntar antes, libre o solo mirar (hilosenda)"),
 		handler: async (args, ctx) => {
 			const pedido = args?.trim().toLowerCase();
 			const modo = PERMISOS.find((p) => p.id === pedido || p.corto.toLowerCase() === pedido || aIdentificador(p.etiqueta) === aIdentificador(pedido ?? ""));
@@ -1352,32 +1358,32 @@ export default function hilosenda(pi: ExtensionAPI) {
 		},
 	});
 	pi.registerCommand("instrucciones", {
-		description: "Elige un archivo .md o .txt con reglas para la IA (hilosenda)",
+		description: tr("Elige un archivo .md o .txt con reglas para la IA (hilosenda)"),
 		handler: async (args, ctx) => {
 			const ruta = args?.trim();
 			if (ruta) {
-				if (!existsSync(ruta)) return ctx.ui.notify(`No existe: ${ruta}`, "error");
+				if (!existsSync(ruta)) return ctx.ui.notify(tr("No existe: {0}", [ruta]), "error");
 				guardarPreferencias({ instrucciones: ruta, instruccionesActivas: true });
 				pedirRenderBarra?.();
-				return ctx.ui.notify(`La IA seguira las instrucciones de ${nombreCorto(ruta)}`, "info");
+				return ctx.ui.notify(tr("La IA seguira las instrucciones de {0}", [nombreCorto(ruta)]), "info");
 			}
 			await ejecutarAccion(ctx, "instrucciones");
 		},
 	});
-	pi.registerCommand("historial", { description: "Busca y continua conversaciones anteriores (hilosenda)", handler: async (_a, ctx) => abrirHistorial(ctx) });
-	pi.registerCommand("conectar", { description: "Conecta una IA nueva y detecta sus modelos (hilosenda)", handler: async (_a, ctx) => ejecutarAccion(ctx, "conectar") });
-	pi.registerCommand("ajustes", { description: "Ajustes de hilosenda (hilosenda)", handler: async (_a, ctx) => ajustes(ctx) });
-	pi.registerCommand("ayuda", { description: "Como usar hilosenda (hilosenda)", handler: async (_a, ctx) => ejecutarAccion(ctx, "ayuda") });
-	pi.registerCommand("inicio", { description: "Vuelve a la pantalla de inicio de hilosenda", handler: async (_a, ctx) => ejecutarAccion(ctx, "inicio") });
+	pi.registerCommand("historial", { description: tr("Busca y continua conversaciones anteriores (hilosenda)"), handler: async (_a, ctx) => abrirHistorial(ctx) });
+	pi.registerCommand("conectar", { description: tr("Conecta una IA nueva y detecta sus modelos (hilosenda)"), handler: async (_a, ctx) => ejecutarAccion(ctx, "conectar") });
+	pi.registerCommand("ajustes", { description: tr("Ajustes de hilosenda (hilosenda)"), handler: async (_a, ctx) => ajustes(ctx) });
+	pi.registerCommand("ayuda", { description: tr("Como usar hilosenda (hilosenda)"), handler: async (_a, ctx) => ejecutarAccion(ctx, "ayuda") });
+	pi.registerCommand("inicio", { description: tr("Vuelve a la pantalla de inicio de hilosenda"), handler: async (_a, ctx) => ejecutarAccion(ctx, "inicio") });
 	pi.registerCommand("nuevo", {
-		description: "Empieza una conversacion nueva (hilosenda)",
+		description: tr("Empieza una conversacion nueva (hilosenda)"),
 		handler: async (_a, ctx) => {
 			await ctx.newSession();
 		},
 	});
 
 	pi.registerShortcut("f1", {
-		description: "Abrir el menu de hilosenda",
+		description: tr("Abrir el menu de hilosenda"),
 		handler: (ctx) => mostrarMenu(ctx),
 	});
 }

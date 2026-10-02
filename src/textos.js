@@ -1,6 +1,8 @@
 // Textos de ayuda compartidos por la pantalla de inicio y el chat.
 
-export const AYUDA_GENERAL = `hilosenda es un asistente de IA que trabaja dentro de una carpeta de tu computadora: puede leer tus archivos, escribir codigo, corregir errores y ejecutar comandos por ti.
+import { tr } from "./i18n.js";
+
+export const AYUDA_GENERAL = tr(`hilosenda es un asistente de IA que trabaja dentro de una carpeta de tu computadora: puede leer tus archivos, escribir codigo, corregir errores y ejecutar comandos por ti.
 
 PASO 1 · Conecta una IA
   Pulsa «Conectar una IA». Si tienes Ollama o LM Studio abiertos, se detectan solos.
@@ -29,4 +31,4 @@ PERMISOS
 
 INSTRUCCIONES
   Puedes elegir cualquier archivo .md o .txt con reglas para la IA (idioma, estilo,
-  tecnologias que debe usar...). La IA lo leera antes de cada respuesta.`;
+  tecnologias que debe usar...). La IA lo leera antes de cada respuesta.`);

@@ -114,6 +114,13 @@ para todo el chat.
 **Ajustes**: tema (automatico, oscuro o claro), razonamiento por defecto, barra de botones,
 consejos para principiantes, animacion, ventana del sistema para carpetas, conexiones guardadas.
 
+### Idiomas
+
+hilosenda habla español, English, Português, Français, Deutsch e Italiano. Usa
+automaticamente el idioma de tu sistema (`LANG`, `LC_ALL`, o la configuracion regional de
+Windows/macOS) y la IA responde en ese idioma. Puedes cambiarlo en **Ajustes → Idioma**.
+Las traducciones estan en `src/idiomas/<codigo>.json`.
+
 ## Comandos
 
 Todo se puede hacer con clics, pero tambien hay comandos en español:

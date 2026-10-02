@@ -11,6 +11,7 @@ import { execFile } from "node:child_process";
 import { existsSync } from "node:fs";
 import { delimiter, join } from "node:path";
 import { elegirConPortal } from "./portal.js";
+import { tr } from "../i18n.js";
 
 /**
  * @typedef {{ estado: "ok", ruta: string } | { estado: "cancelado" } | { estado: "no-disponible", motivo: string }} Resultado
@@ -167,7 +168,7 @@ async function elegirLinux(tipo, titulo, inicio) {
  * @returns {Promise<Resultado>}
  */
 export async function elegirConVentana(tipo, opciones = {}) {
-	const titulo = opciones.titulo ?? (tipo === "carpeta" ? "Elige la carpeta de tu proyecto" : tipo === "imagen" ? "Elige una imagen" : "Elige el archivo de instrucciones (.md o .txt)");
+	const titulo = opciones.titulo ?? (tipo === "carpeta" ? tr("Elige la carpeta de tu proyecto") : tipo === "imagen" ? tr("Elige una imagen") : tr("Elige el archivo de instrucciones (.md o .txt)"));
 	const inicio = opciones.inicio && existsSync(opciones.inicio) ? opciones.inicio : undefined;
 	try {
 		if (process.platform === "win32") return await elegirWindows(tipo, titulo, inicio);
