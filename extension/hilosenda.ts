@@ -1062,8 +1062,23 @@ export default function hilosenda(pi: ExtensionAPI) {
 		ctx.ui.setFooter((tui, _tema, datos) => {
 			let zonas: Array<{ id: string; x0: number; x1: number }> = [];
 			let hover = "";
+			let cachePie: { ancho: number; hora: number; hover: string; lineas: string[] } | undefined;
 			return {
 				render(ancho: number) {
+					// Calcular la barra cuesta en chats largos: se reutiliza durante medio segundo.
+					if (cachePie && cachePie.ancho === ancho && Date.now() - cachePie.hora < 500 && cachePie.hover === hover) return cachePie.lineas;
+					const lineas = dibujarPie(ancho);
+					cachePie = { ancho, hora: Date.now(), hover, lineas };
+					return lineas;
+				},
+				invalidate() {
+					cachePie = undefined;
+				},
+				handleMouse(evento: EventoRaton) {
+					return ratonPie(evento);
+				},
+			};
+			function dibujarPie(ancho: number) {
 					const e = estiloActual();
 					const c = ctxActual;
 					const fondo = e.c.barra;
@@ -1106,9 +1121,8 @@ export default function hilosenda(pi: ExtensionAPI) {
 					const hueco = ancho - x - visibleWidth(marca);
 					linea += hueco > 0 ? e.pintar(" ".repeat(hueco), { bg: fondo }) + marca : e.pintar(" ".repeat(Math.max(0, ancho - x)), { bg: fondo });
 					return [linea];
-				},
-				invalidate() {},
-				handleMouse(evento: EventoRaton) {
+			}
+			function ratonPie(evento: EventoRaton) {
 					const zona = zonas.find((z) => evento.x >= z.x0 && evento.x <= z.x1);
 					if (evento.type === "move" || evento.type === "drag") {
 						limpiarHovers();
@@ -1121,8 +1135,7 @@ export default function hilosenda(pi: ExtensionAPI) {
 					if (!zona || evento.button !== "left") return undefined;
 					if (evento.type === "click" && ctxActual) void ejecutarAccion(ctxActual, zona.id);
 					return { handled: true };
-				},
-			};
+			}
 		});
 	}
 

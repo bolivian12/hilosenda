@@ -76,6 +76,9 @@ export class App {
 	async detectarFondo() {
 		const tema = this.preferencias.tema ?? "auto";
 		if (tema === "oscuro" || tema === "claro") return;
+		// El fondo de la consola no cambia entre chats: se pregunta una sola vez.
+		if (this.fondoDetectado) return;
+		this.fondoDetectado = true;
 		try {
 			const colores = await this.tui.queryTerminalColors({ timeoutMs: 150 });
 			if (colores?.background) this.usarEstilo(!esFondoClaro(colores.background));
@@ -152,6 +155,11 @@ export class App {
 	 * las conversaciones y la IA local detectada. Los botones usan estos datos ya listos.
 	 */
 	refrescarDatos() {
+		if (this.refrescoAplazado) {
+			this.refrescoAplazado = false;
+			setTimeout(() => this.refrescarDatos(), 400);
+			return;
+		}
 		this.cargaModelos = listarModelosPi()
 			.then((modelos) => {
 				this.modelos = modelos;
@@ -488,6 +496,8 @@ export class App {
 			const { traspaso } = await abrirPi({ carpeta, argumentos, alIniciar, tema: this.preferencias.tema });
 			this.encender();
 			this.preferencias = leerPreferencias();
+			// Dibujar ya la pantalla de inicio; las recargas en segundo plano esperan un poco.
+			this.refrescoAplazado = true;
 			if (traspaso?.accion === "carpeta") {
 				carpeta = traspaso.ruta;
 				this.usarCarpeta(carpeta);
