@@ -13,7 +13,8 @@ import { homedir } from "node:os";
 import { basename, extname } from "node:path";
 import type { ExtensionAPI, ExtensionCommandContext, ExtensionContext } from "@earendil-works/pi-coding-agent";
 import { CustomEditor, SessionManager } from "@earendil-works/pi-coding-agent";
-import { visibleWidth } from "@earendil-works/pi-tui";
+import { Image, matchesKey, visibleWidth } from "@earendil-works/pi-tui";
+import { leerPortapapeles, rutasDesdeTexto } from "../src/core/portapapeles.js";
 import { guardarAjustesPi } from "../src/core/pi-config.js";
 import { guardarPreferencias as guardarPreferenciasDisco, leerPreferencias as leerPreferenciasDisco } from "../src/core/preferencias.js";
 import { aIdentificador, conectarIA } from "../src/flujos/conectar.js";
@@ -108,6 +109,33 @@ class EditorHilosenda extends CustomEditor {
 	detalle: () => string = () => "";
 	/** Hay algo para enviar aunque no haya texto (por ejemplo una imagen). */
 	hayAdjuntos: () => boolean = () => false;
+	/** Recibe archivos pegados o arrastrados; devuelve true si los adjunto. */
+	alPegarArchivos: (rutas: string[]) => boolean = () => false;
+	/** Pega desde el portapapeles (Ctrl+V o clic derecho). */
+	alPegarPortapapeles?: () => void;
+	private pegando = "";
+
+	override handleInput(data: string): void {
+		// Ctrl+V (Alt+V en Windows): archivos, imagenes o texto del portapapeles.
+		const atajoPegar = matchesKey(data, "ctrl+v") || (process.platform === "win32" && matchesKey(data, "alt+v"));
+		if (atajoPegar && this.alPegarPortapapeles) {
+			this.alPegarPortapapeles();
+			return;
+		}
+		// Texto pegado (o archivos arrastrados): si son rutas de archivos, se adjuntan.
+		if (this.pegando || data.includes("\x1b[200~")) {
+			this.pegando += data;
+			if (!this.pegando.includes("\x1b[201~")) return;
+			const completo = this.pegando;
+			this.pegando = "";
+			const contenido = completo.slice(completo.indexOf("\x1b[200~") + 6, completo.indexOf("\x1b[201~"));
+			const rutas = rutasDesdeTexto(contenido);
+			if (rutas.length && this.alPegarArchivos(rutas)) return;
+			super.handleInput(completo);
+			return;
+		}
+		super.handleInput(data);
+	}
 	alPulsar?: (id: string) => void;
 	private hover = "";
 	private presionado = "";
@@ -176,6 +204,11 @@ class EditorHilosenda extends CustomEditor {
 	}
 
 	override handleMouse(evento: EventoRaton) {
+		// Clic derecho sobre el cuadro de texto: pegar.
+		if (evento.button === "right" && evento.type === "press" && (!this.anchoEditor || evento.x <= this.anchoEditor)) {
+			this.alPegarPortapapeles?.();
+			return { handled: true };
+		}
 		const id = this.objetivo(evento);
 		if (evento.type === "move" || evento.type === "drag") {
 			if (id !== this.hover) {
@@ -195,7 +228,7 @@ class EditorHilosenda extends CustomEditor {
 				this.presionado = "";
 				if (id && id === pulsado) {
 					if (id === "enviar") {
-						if (this.getText().trim() === "" && this.hayAdjuntos()) this.setText("¿Qué ves en esta imagen?");
+						if (this.getText().trim() === "" && this.hayAdjuntos()) this.setText("Revisa lo que te adjunto.");
 						if (this.getText().trim() !== "") this.handleInput("\r");
 					} else this.alPulsar?.(id);
 				}
@@ -218,7 +251,11 @@ export default function hilosenda(pi: ExtensionAPI) {
 	let filaSugerencias: Mosaico | undefined;
 	let costoCache = { entradas: -1, total: 0 };
 	let trabajando = false;
-	const imagenesPendientes: Array<{ nombre: string; imagen: { type: "image"; data: string; mimeType: string } }> = [];
+	type Adjunto = { nombre: string; ruta?: string; bytes: number; imagen?: { type: "image"; data: string; mimeType: string } };
+	const adjuntos: Adjunto[] = [];
+	let pedirRenderAdjuntos: (() => void) | undefined;
+	const TIPOS_IMAGEN: Record<string, string> = { ".png": "image/png", ".jpg": "image/jpeg", ".jpeg": "image/jpeg", ".gif": "image/gif", ".webp": "image/webp" };
+	const tamano = (b: number) => (b < 1024 ? `${b} B` : b < 1048576 ? `${Math.round(b / 1024)} KB` : `${(b / 1048576).toFixed(1)} MB`);
 	let dialogoAbierto = false;
 	let herramientasAntesDeLectura: string[] | undefined;
 	const permitidosEnSesion = new Set<string>();
@@ -475,7 +512,7 @@ export default function hilosenda(pi: ExtensionAPI) {
 		await conDialogo(ctx, async (ui) => {
 			const propios = [
 				{ id: "h:conectar", etiqueta: "Conectar una IA", detalle: "Agrega Ollama, Claude, GPT, Gemini o cualquier otra; detecta sus modelos solo", grupo: "hilosenda" },
-				{ id: "h:imagen", etiqueta: "Adjuntar imagen", detalle: "Envía una foto o captura junto a tu mensaje (también puedes pegarla con Ctrl+V)", grupo: "hilosenda" },
+				{ id: "h:imagen", etiqueta: "Adjuntar archivo o imagen", detalle: "Envía fotos o documentos junto a tu mensaje (también: Ctrl+V, clic derecho o arrastrar)", grupo: "hilosenda" },
 				{ id: "h:modelo", etiqueta: "Elegir modelo", detalle: "Cambia la IA que responde", grupo: "hilosenda" },
 				{ id: "h:razonamiento", etiqueta: "Razonamiento", detalle: "Cuanto piensa la IA antes de responder", grupo: "hilosenda" },
 				{ id: "h:historial", etiqueta: "Conversaciones anteriores", detalle: "Busca y continua cualquier chat anterior", grupo: "hilosenda" },
@@ -610,32 +647,8 @@ export default function hilosenda(pi: ExtensionAPI) {
 				return;
 			case "imagen":
 				return conDialogo(ctx, async (ui) => {
-					if (imagenesPendientes.length) {
-						const que = await ui.botones({
-							titulo: "Imágenes adjuntas",
-							explicacion: `Se enviarán con tu próximo mensaje: ${imagenesPendientes.map((i) => i.nombre).join(", ")}`,
-							botones: [
-								{ id: "otra", etiqueta: "Agregar otra", tipo: "primario" },
-								{ id: "quitar", etiqueta: "Quitar todas", tipo: "peligro" },
-								{ id: "volver", etiqueta: "← Volver", tipo: "suave" },
-							],
-							grande: false,
-						});
-						if (que === "quitar") imagenesPendientes.length = 0;
-						if (que !== "otra") return;
-					}
 					const ruta = await elegirImagen(ui, { inicio: ctx.cwd, ventana: leerPreferencias().selectorGrafico });
-					if (!ruta) return;
-					const tipos: Record<string, string> = { ".png": "image/png", ".jpg": "image/jpeg", ".jpeg": "image/jpeg", ".gif": "image/gif", ".webp": "image/webp" };
-					const mimeType = tipos[extname(ruta).toLowerCase()];
-					if (!mimeType) return ctx.ui.notify("Ese archivo no es una imagen (.png, .jpg, .gif o .webp).", "warning");
-					if (statSync(ruta).size > 20 * 1024 * 1024) return ctx.ui.notify("La imagen es demasiado grande (máximo 20 MB).", "warning");
-					imagenesPendientes.push({ nombre: basename(ruta), imagen: { type: "image", data: readFileSync(ruta).toString("base64"), mimeType } });
-					if (!ctx.model?.input?.includes("image")) {
-						ctx.ui.notify(`Ojo: ${nombreModelo(ctx.model)} no puede ver imágenes. Cambia a un modelo que sí pueda (por ejemplo Claude, GPT o Gemini).`, "warning");
-					} else {
-						ctx.ui.notify("Imagen adjunta. Escribe tu pregunta y pulsa Enviar.", "info");
-					}
+					if (ruta) adjuntarArchivos(ctx, [ruta]);
 				});
 			case "detener":
 				ctx.abort();
@@ -650,11 +663,138 @@ export default function hilosenda(pi: ExtensionAPI) {
 
 	// --- Barra de botones ----------------------------------------------------------
 
+	/** Adjunta archivos: las imagenes se envian como imagen y el resto como documento. */
+	function adjuntarArchivos(ctx: ExtensionContext, rutas: string[]): boolean {
+		let alguno = false;
+		for (const ruta of rutas) {
+			let info;
+			try {
+				info = statSync(ruta);
+			} catch {
+				continue;
+			}
+			if (info.isDirectory()) {
+				adjuntos.push({ nombre: `${basename(ruta)}/`, ruta, bytes: 0 });
+				alguno = true;
+				continue;
+			}
+			const mime = TIPOS_IMAGEN[extname(ruta).toLowerCase()];
+			if (mime && info.size <= 20 * 1024 * 1024) {
+				adjuntos.push({ nombre: basename(ruta), ruta, bytes: info.size, imagen: { type: "image", data: readFileSync(ruta).toString("base64"), mimeType: mime } });
+			} else {
+				adjuntos.push({ nombre: basename(ruta), ruta, bytes: info.size });
+			}
+			alguno = true;
+		}
+		if (!alguno) return false;
+		if (adjuntos.some((a) => a.imagen) && !ctx.model?.input?.includes("image")) {
+			ctx.ui.notify(`Ojo: ${nombreModelo(ctx.model)} no puede ver imágenes. Cambia a un modelo que sí pueda (por ejemplo Claude, GPT o Gemini).`, "warning");
+		}
+		instalarAdjuntos(ctx);
+		return true;
+	}
+
+	function adjuntarImagenPegada(ctx: ExtensionContext, datos: Buffer, mime: string) {
+		const n = adjuntos.filter((a) => a.imagen).length + 1;
+		adjuntos.push({ nombre: `imagen pegada ${n}`, bytes: datos.length, imagen: { type: "image", data: datos.toString("base64"), mimeType: mime } });
+		instalarAdjuntos(ctx);
+	}
+
+	async function pegarPortapapeles(ctx: ExtensionContext) {
+		const contenido = await leerPortapapeles().catch(() => undefined);
+		if (!contenido) {
+			ctx.ui.notify("El portapapeles está vacío o no se pudo leer (en Linux instala wl-clipboard o xclip).", "warning");
+			return;
+		}
+		if (contenido.tipo === "archivos") adjuntarArchivos(ctx, contenido.rutas);
+		else if (contenido.tipo === "imagen") adjuntarImagenPegada(ctx, contenido.datos, contenido.mime);
+		else {
+			const rutas = rutasDesdeTexto(contenido.texto);
+			if (!(rutas.length && adjuntarArchivos(ctx, rutas))) ctx.ui.pasteToEditor(contenido.texto);
+		}
+	}
+
+	/** Vista previa de lo que se va a enviar, encima del cuadro de texto. */
+	function instalarAdjuntos(ctx: ExtensionContext) {
+		if (adjuntos.length === 0) {
+			ctx.ui.setWidget("hilosenda-adjuntos", undefined);
+			pedirRenderAdjuntos = undefined;
+			return;
+		}
+		ctx.ui.setWidget(
+			"hilosenda-adjuntos",
+			(tui, tema) => {
+				pedirRenderAdjuntos = () => tui.requestRender();
+				const imagenes = new Map<Adjunto, Image>();
+				let zonas: Array<{ y: number; x0: number; x1: number; indice: number }> = [];
+				let hover = -1;
+				return {
+					render(ancho: number) {
+						const e = estiloActual();
+						const lineas = ["", e.pintar(`  Se enviará con tu mensaje (${adjuntos.length}):`, { fg: e.c.suave })];
+						zonas = [];
+						adjuntos.forEach((a, i) => {
+							if (a.imagen) {
+								let img = imagenes.get(a);
+								if (!img) {
+									img = new Image(a.imagen.data, a.imagen.mimeType, { fallbackColor: (t: string) => tema.fg("muted", t) }, { maxWidthCells: 40, maxHeightCells: 10, filename: a.nombre });
+									imagenes.set(a, img);
+								}
+								for (const l of img.render(Math.min(ancho - 4, 40))) lineas.push(`    ${l}`);
+							}
+							const icono = a.imagen ? "▣" : a.nombre.endsWith("/") ? "▤" : "≡";
+							const texto = `  ${icono}  ${a.nombre}${a.bytes ? `  ·  ${tamano(a.bytes)}` : ""}   `;
+							const quitar = " ✕ quitar ";
+							zonas.push({ y: lineas.length, x0: visibleWidth(texto), x1: visibleWidth(texto) + visibleWidth(quitar) - 1, indice: i });
+							lineas.push(e.pintar(texto, { fg: e.c.texto }) + e.pintar(quitar, { fg: hover === i ? e.c.error : e.c.tenue, bg: hover === i ? e.c.tarjetaHover : undefined }));
+						});
+						return lineas;
+					},
+					invalidate() {
+						for (const img of imagenes.values()) img.invalidate();
+					},
+					handleMouse(evento: EventoRaton) {
+						const zona = zonas.find((z) => z.y === evento.y && evento.x >= z.x0 && evento.x <= z.x1);
+						if (evento.type === "move" || evento.type === "drag") {
+							const nuevo = zona ? zona.indice : -1;
+							if (nuevo === hover) return undefined;
+							hover = nuevo;
+							return { handled: true, render: true };
+						}
+						if (!zona || evento.button !== "left") return undefined;
+						if (evento.type === "click" && ctxActual) {
+							adjuntos.splice(zona.indice, 1);
+							hover = -1;
+							instalarAdjuntos(ctxActual);
+						}
+						return { handled: true };
+					},
+				};
+			},
+			{ placement: "aboveEditor" },
+		);
+	}
+
+	/** Texto que acompaña a los documentos adjuntos (no imagenes). */
+	function textoDocumentos(lista: Adjunto[]): string {
+		const partes: string[] = [];
+		for (const a of lista) {
+			if (!a.ruta) continue;
+			const esTexto = a.bytes > 0 && a.bytes <= 200 * 1024 && !readFileSync(a.ruta).subarray(0, 4096).includes(0);
+			if (esTexto) {
+				partes.push(`Archivo adjunto «${a.nombre}» (${a.ruta}):\n\`\`\`\n${readFileSync(a.ruta, "utf8")}\n\`\`\``);
+			} else {
+				partes.push(`Archivo adjunto «${a.nombre}»: ${a.ruta}\n(Ábrelo o conviértelo con tus herramientas para leer su contenido.)`);
+			}
+		}
+		return partes.join("\n\n");
+	}
+
 	function botonesLaterales(): BotonLateral[] {
 		const lista: BotonLateral[] = [];
 		if (trabajando) lista.push({ id: "detener", icono: "■", etiqueta: "Detener", peligro: true });
 		lista.push(
-			{ id: "imagen", icono: "▣", etiqueta: imagenesPendientes.length ? `Imágenes (${imagenesPendientes.length})` : "Adjuntar imagen" },
+			{ id: "imagen", icono: "▣", etiqueta: "Adjuntar archivo" },
 			{ id: "modelo", icono: "◆", etiqueta: "Cambiar modelo" },
 			{ id: "razonamiento", icono: "◑", etiqueta: "Razonamiento" },
 			{ id: "historial", icono: "❝", etiqueta: "Chats anteriores" },
@@ -936,10 +1076,14 @@ export default function hilosenda(pi: ExtensionAPI) {
 				editor.botones = botonesLaterales;
 				editor.detalle = () => {
 					const partes = [`· ◆ ${nombreModelo(ctxActual?.model)}`];
-					if (imagenesPendientes.length) partes.push(`· ▣ ${imagenesPendientes.map((i) => i.nombre).join(", ")}`);
+					if (adjuntos.length) partes.push(`· ${adjuntos.length} adjunto${adjuntos.length > 1 ? "s" : ""}`);
 					return partes.join(" ");
 				};
-				editor.hayAdjuntos = () => imagenesPendientes.length > 0;
+				editor.hayAdjuntos = () => adjuntos.length > 0;
+				editor.alPegarArchivos = (rutas) => (ctxActual ? adjuntarArchivos(ctxActual, rutas) : false);
+				editor.alPegarPortapapeles = () => {
+					if (ctxActual) void pegarPortapapeles(ctxActual);
+				};
 				editor.alPulsar = (id) => {
 					if (ctxActual) void ejecutarAccion(ctxActual, id);
 				};
@@ -979,10 +1123,13 @@ export default function hilosenda(pi: ExtensionAPI) {
 		ctx.ui.setWidget("hilosenda-consejo", undefined);
 		filaSugerencias = undefined;
 		// Adjunta las imagenes elegidas con el boton al mensaje que se envia.
-		if (imagenesPendientes.length && !evento.text.trim().startsWith("/")) {
-			const imagenes = [...(evento.images ?? []), ...imagenesPendientes.map((i) => i.imagen)];
-			imagenesPendientes.length = 0;
-			return { action: "transform" as const, text: evento.text, images: imagenes };
+		if (adjuntos.length && !evento.text.trim().startsWith("/")) {
+			const lista = adjuntos.splice(0);
+			instalarAdjuntos(ctx);
+			const imagenes = [...(evento.images ?? []), ...lista.flatMap((a) => (a.imagen ? [a.imagen] : []))];
+			const documentos = textoDocumentos(lista.filter((a) => !a.imagen));
+			const texto = documentos ? `${evento.text}\n\n${documentos}` : evento.text;
+			return { action: "transform" as const, text: texto, images: imagenes };
 		}
 		return undefined;
 	});

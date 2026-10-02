@@ -69,7 +69,7 @@ export async function explorar(ui, tipo, inicio, aviso) {
 				}
 				if (esCarpeta) {
 					elementos.push({ id: `d:${entrada.name}`, etiqueta: `▸ ${entrada.name}/`, grupo: "Carpetas", valor: { accion: "ir", ruta } });
-				} else if ((tipo === "instrucciones" && esArchivoInstrucciones(entrada.name)) || (tipo === "imagen" && esImagen(entrada.name))) {
+				} else if ((tipo === "instrucciones" && esArchivoInstrucciones(entrada.name)) || tipo === "imagen") {
 					let detalle = "";
 					try {
 						detalle = tamano(statSync(ruta).size);
